@@ -23,13 +23,17 @@ const NUM_LEAVES: [usize; 3] = [1024, 2048, 4096];
 
 fn build_dapol(c: &mut Criterion) {
     let mut group = c.benchmark_group("build");
+
+    // STENT why these parameters?
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
     group.measurement_time(Duration::from_secs(20));
 
     // bench tree height = 16
+    // STENT this code is literally a duplicate of the next bit of code, can rather just have 2 loops and iter thru TREE_HEIGHTS
     let tree_height = 16;
     for &num_leaves in NUM_LEAVES.iter() {
+        // STENT better variable name here
         let items = build_item_list(num_leaves, tree_height);
         group.bench_function(BenchmarkId::new("height_16", num_leaves), |bench| {
             bench.iter(|| {
@@ -56,10 +60,12 @@ fn build_dapol(c: &mut Criterion) {
     group.finish();
 }
 
+// STENT what about proof generation for that batch version? dapol.generate_proof_batch
 fn generate_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("prove");
     group.sample_size(10);
 
+    // STENT there should be some explanation as to why this is the case
     // this benchmark depends on the tree height and not the number of leaves,
     // so we just pick the smallest number of leaves
     let num_leaves = NUM_LEAVES[0];
@@ -90,6 +96,7 @@ fn generate_proof(c: &mut Criterion) {
     group.finish();
 }
 
+// STENT what about proof verification for that batch version? dapol.generate_proof_batch
 fn verify_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("verify");
     group.sample_size(10);
@@ -104,6 +111,7 @@ fn verify_proof(c: &mut Criterion) {
 
         let dapol = build_dapol_tree::<blake3::Hasher, RangeProofSplitting>(&items, tree_height);
         group.bench_function(BenchmarkId::new("splitting", tree_height), |bench| {
+            // STENT how does this batch iter work?
             bench.iter_batched(
                 || {
                     // generate a proof
@@ -151,21 +159,26 @@ where
     D: Digest + Default + Clone + TypeName + Debug,
     R: Clone + Serializable + RangeProvable + RangeVerifiable + TypeName,
 {
+    // STENT if this secret is like the generator key thing spoken about in the paper then it could be named better
     let secret = get_secret();
     let mut dapol = Dapol::<D, R>::new_blank(tree_height, tree_height);
     dapol.build(&items, &secret);
     dapol
 }
 
+// STENT not sure we want a function like this living here since it's only used for benching
+//   this basically just generates random data
 fn build_item_list(
     num_leaves: usize,
     tree_height: usize,
+    // STENT this tuple can be confusing when it's referred to as .0 or .1
+    //   rather make a struct for this
 ) -> Vec<(TreeIndex, DapolNode<blake3::Hasher>)> {
     let mut result = Vec::new();
     let mut value = DapolNode::<blake3::Hasher>::default();
     let stride = 2usize.pow(tree_height as u32) / num_leaves;
     for i in 0..num_leaves {
-        let idx = TreeIndex::from_u64(tree_height, (i * stride) as u64);
+        let idx = TreeIndex::from_u64(tree_height, (i * stride) as u64); // STENT this is not random distribution which may affect benching outcomes
         value.randomize();
         result.push((idx, value.clone()));
     }

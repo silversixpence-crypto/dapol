@@ -62,8 +62,11 @@ fn generate_single_range_proof(secret: u64, blinding: &Scalar) -> RangeProof {
 }
 
 fn generate_aggregated_range_proof(secrets: &[u64], blindings: &[Scalar]) -> RangeProof {
+    // STENT what is this?
     let pc_gens = PedersenGens::default();
+    // STENT what is this?
     let bp_gens = BulletproofGens::new(BIT_SIZE, secrets.len());
+    // STENT what is this?
     let mut prover_transcript = Transcript::new(&[]);
     let (proof, _commitments) = RangeProof::prove_multiple(
         &bp_gens,
@@ -81,8 +84,11 @@ fn generate_aggregated_range_proof(secrets: &[u64], blindings: &[Scalar]) -> Ran
 // ================================================================================================
 
 fn verify_single_range_proof(proof: &RangeProof, commitment: &CompressedRistretto) -> bool {
+    // STENT what is this?
     let pc_gens = PedersenGens::default();
+    // STENT what is this?
     let bp_gens = BulletproofGens::new(BIT_SIZE, 1);
+    // STENT what is this?
     let mut verifier_transcript = Transcript::new(&[]);
     if proof
         .verify_single(
@@ -121,6 +127,10 @@ fn verify_aggregated_range_proof(proof: &RangeProof, commitments: &[CompressedRi
 // PROOF DESERIALIZATION
 // ================================================================================================
 
+// STENT this whole file has split functionality between 'individual' and 'aggregated'
+//   these should be better coded for, e.g. have a type that is 'individual' and one that is 'aggregated'
+//   and then traits for deseserialization, proof construction and verification
+
 fn deserialize_range_proof(
     bytes: &[u8],
     byte_num: usize,
@@ -152,7 +162,11 @@ fn deserialize_individual_proofs(
     begin: &mut usize,
 ) -> Result<Vec<RangeProof>, DecodingError> {
     let mut individual: Vec<RangeProof> = Vec::new();
+
+    // STENT what is the point in having this byte size lower bound?
+    //   this should be coded better, where there is a type (with underlying byte variable) that has the lower bound built in
     let individual_num = bytes_to_usize_with_error(bytes, INDIVIDUAL_NUM_BYTE_NUM, begin)?;
+
     for _ in 0..individual_num {
         let proof = deserialize_range_proof(bytes, SINGLE_PROOF_BYTE_NUM, begin)?;
         individual.push(proof);

@@ -95,6 +95,7 @@ impl<D> ProofExtractable for DapolNode<D> {
     }
 }
 
+// STENT and it's used for benching
 // TODO: this seems to be used for testing purposes only
 impl<D: Digest> Rand for DapolNode<D> {
     /// Randomly generates a DAPOL node with random value and random blinding factor.

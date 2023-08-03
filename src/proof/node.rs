@@ -70,6 +70,7 @@ impl<D: Digest> Mergeable for DapolProofNode<D> {
 }
 
 impl<D: Digest> Serializable for DapolProofNode<D> {
+    // STENT this comment is wrong since the tree only supports one commitment per node
     /// (Com_1 || Hash_1) || ... || (Com_n || Hash_n)
     fn serialize(&self) -> Vec<u8> {
         let mut result = Vec::new();
@@ -78,7 +79,10 @@ impl<D: Digest> Serializable for DapolProofNode<D> {
         result
     }
 
+    // STENT why is 'begin' a parameter? Surely it should always be 0?
+    //   seems like it has to do with the fact that this function has the prefix '_as_a_unit' but it's never used for begin != 0
     fn deserialize_as_a_unit(bytes: &[u8], begin: &mut usize) -> Result<Self, DecodingError> {
+        // STENT it's not super clear where this const comes from, would be better if it came from the pedersen commitments library
         let unit_byte_num = COM_BYTE_NUM + D::output_size();
         if bytes.len() - *begin < unit_byte_num {
             return Err(DecodingError::BytesNotEnough);
@@ -94,9 +98,11 @@ impl<D: Digest> Serializable for DapolProofNode<D> {
         }
         let node = DapolProofNode {
             com: commitment.unwrap(),
+            // STENT why is there no length check on the hash?
             hash: bytes[*begin..*begin + D::output_size()].to_vec(),
             _phantom_hash_function: PhantomData,
         };
+        // STENT why increase this?
         *begin += D::output_size();
         Ok(node)
     }

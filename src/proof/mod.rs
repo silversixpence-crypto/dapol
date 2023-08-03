@@ -86,6 +86,7 @@ where
     // HELPER METHODS
     // --------------------------------------------------------------------------------------------
 
+    // STENT naming here could be better
     fn verify_proof(&self) -> bool {
         let mut commitments = Vec::new();
         for i in 0..self.merkle.get_siblings_num() {

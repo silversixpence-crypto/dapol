@@ -23,6 +23,7 @@ mod tests;
 // CONSTANTS
 // ================================================================================================
 
+// STENT what is the reasoning behind each value?
 const MAX_TREE_HEIGHT: usize = 64;
 const MIN_SPARSITY: usize = 2;
 const DIGEST_SIZE: usize = 32;
@@ -42,14 +43,15 @@ pub struct LiabilityId(Vec<u8>);
 /// a randomly derived seed and a date of th audit. `tree_height` cannot exceed 64.
 pub struct DapolOptions {
     audit_seed: Vec<u8>,
-    tree_height: usize,
-    aggregation_factor: usize,
+    tree_height: usize, // STENT the type here should include the max value defined above
+    aggregation_factor: usize, // STENT this also needs limits
     secret: Secret, // TODO: should we derive this from `audit_seed`?
 }
 
 /// Represents a single liability. `internal_id` is the unique identifier of an account internal
 /// to the audited system, while `external_id` is a unique identifier known to the user (e.g. an
 /// email address). External and internal IDs can be the same.
+// STENT i'm not convinced we need this internal/external, what defines the mapping between the 2 values?
 pub struct Liability {
     pub internal_id: LiabilityId,
     pub external_id: LiabilityId,
@@ -79,7 +81,7 @@ pub struct Dapol<D, R> {
     smt: SparseMerkleTree<DapolNode<D>>,
     id_to_idx_map: IdToIndexMap,
     aggregation_factor: usize,
-    _phantom_r: PhantomData<R>,
+    _phantom_r: PhantomData<R>, // STENT not clear what this is for, but from impl type restriction it seems to be the range proofs
 }
 
 impl<D, R> Dapol<D, R>
@@ -98,7 +100,9 @@ where
     ///   of leaves in the tree.
     /// * List of liabilities contains duplicated internal IDs.
     pub fn new(liabilities: Vec<Liability>, options: DapolOptions) -> Result<Self, DapolError> {
+        // STENT this should be built into the D type, and the other range requirements on the other types
         if D::output_size() != DIGEST_SIZE {
+            // STENT why return an error here as apposed to panic? Input is wrong => you can't go further => bug => panic
             return Err(DapolError::InvalidDigestSize(DIGEST_SIZE, D::output_size()));
         }
         if options.tree_height > MAX_TREE_HEIGHT {
@@ -145,6 +149,8 @@ where
 
     /// Returns a proof for a single liability identified by the specified `internal_id`. If a
     /// liability for the specified ID does not exist in the tree, None is returned.
+    // STENT seems like this function should be the general 'generate_proof'
+    //   and the others named differently
     pub fn generate_proof_for_id(&self, internal_id: &LiabilityId) -> Option<DapolProof<D, R>> {
         let idx = self.id_to_idx_map.get(internal_id)?;
         self.generate_proof(idx)
@@ -156,6 +162,7 @@ where
         &self,
         internal_ids: &[LiabilityId],
     ) -> Option<DapolProof<D, R>> {
+        // STENT could use map here instead of this loop
         let mut indexes = Vec::with_capacity(internal_ids.len());
         for id in internal_ids.iter() {
             indexes.push(*self.id_to_idx_map.get(id)?);
@@ -168,7 +175,7 @@ where
         self.generate_proof_batch(&[*leaf_idx])
     }
 
-    /// Returns a bach proof for a list of liabilities located at the specified leaves.
+    /// Returns a batch proof for a list of liabilities located at the specified leaves.
     pub fn generate_proof_batch(&self, leaf_indexes: &[TreeIndex]) -> Option<DapolProof<D, R>> {
         let refs = self.smt.get_merkle_path_ref_batch(leaf_indexes)?;
 
@@ -178,7 +185,7 @@ where
         let mut blindings: Vec<Scalar> = Vec::new();
         for item in refs.iter().skip(leaf_indexes.len()) {
             let node = self.smt.get_node_by_ref(*item).get_value();
-            merkle_proof.add_sibling(node.get_proof_node());
+            merkle_proof.add_sibling(node.get_proof_node()); // STENT what is this? Are the proofs not done already?
             values.push(node.get_value());
             blindings.push(node.get_blinding());
         }
@@ -193,6 +200,9 @@ where
     // --------------------------------------------------------------------------------------------
     // TODO: methods below are used for testing only and should ideally be moved to a test module
 
+    // STENT this is used in benchmarking, what is the cfg(test) equivalent for that?
+    // STENT why have a blank constructor and then a build function that mutates the values? Why not just do that work here?
+    //   it seems to be because that is how the smt library has it done
     pub fn new_blank(height: usize, aggregation_factor: usize) -> Dapol<D, R> {
         let smt = SparseMerkleTree::<DapolNode<D>>::new(height);
         Dapol {
@@ -203,7 +213,9 @@ where
         }
     }
 
+    // STENT this is used in benchmarking, what is the cfg(test) equivalent for that?
     pub fn build(&mut self, input: &[(TreeIndex, DapolNode<D>)], secret: &Secret) {
+        // STENT it's not clear at all why you need a secret to build an smt
         self.smt.build(input, secret);
     }
 
@@ -238,7 +250,9 @@ where
         merkle_siblings: &mut Vec<DapolProofNode<D>>,
         range_proof: &mut R,
     ) {
+        println!("dfs");
         if idx.get_height() > self.smt.get_height() {
+            println!("first if");
             let leaf = self
                 .smt
                 .get_node_by_ref(smt_ref)
@@ -259,6 +273,7 @@ where
 
         let lch = self.smt.get_node_by_ref(smt_ref).get_lch();
         if let Some(x) = lch {
+            println!("second if");
             self.dfs_handle_child(
                 idx.get_lch_index(),
                 x,
@@ -271,6 +286,7 @@ where
 
         let rch = self.smt.get_node_by_ref(smt_ref).get_rch();
         if let Some(x) = rch {
+            println!("third if");
             self.dfs_handle_child(
                 idx.get_rch_index(),
                 x,
@@ -320,6 +336,7 @@ where
 /// Converts a list of liabilities into a list of (TreeIndex, DapolNode) tuples. Tree index is
 /// derived from audit_id = hash(audit_seed || internal_id). The blinding factor is derived from
 /// user_audit_id = hash(audit_id || external_id).
+// STENT maybe have liabilities be its own struct/type, then this can be a method on that struct/type
 fn build_leaf_nodes<D: Digest>(
     liabilities: Vec<Liability>,
     audit_seed: &[u8],

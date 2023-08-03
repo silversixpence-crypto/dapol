@@ -102,9 +102,11 @@ impl RangeProvable for RangeProofSplitting {
         blindings: &[Scalar],
         aggregated: usize,
     ) -> RangeProofSplitting {
+        // STENT why use a vector when you can use an array because you can work out the length?
         let mut aggregated_proofs: Vec<RangeProof> = Vec::new();
         let mut base = aggregated.next_power_of_two();
         let mut pos = 0usize;
+        // STENT this bit of code is very confusing. Why would the secrets array be in this format?
         while pos < aggregated {
             if aggregated & base > 0 {
                 aggregated_proofs.push(generate_aggregated_range_proof(

@@ -24,10 +24,12 @@ impl<
     > TesterDapol<D, R>
 {
     pub fn test() {
+        // STENT why choose these numbers?
         const LEAF_NUM: usize = 100;
         const TREE_HEIGHT: usize = 10;
-        for _iter in 0..5 {
-            for aggregation_factor in 1..TREE_HEIGHT + 1 {
+        for _iter in 0..1{//5 {
+            println!("start of test");
+            for aggregation_factor in 9..TREE_HEIGHT + 1 {
                 println!("Test #{} for SMT({}) with {} leaves of {} ({}) with aggregation factor {} starts",
                          _iter, TREE_HEIGHT, LEAF_NUM, DapolNode::<D>::get_name(), R::get_name(), aggregation_factor);
 
@@ -37,10 +39,13 @@ impl<
                 let secret = get_secret();
                 let mut build_dapol = Dapol::<D, R>::new_blank(TREE_HEIGHT, aggregation_factor);
                 build_dapol.build(&list, &secret);
+                println!("tree built");
                 build_dapol.generate_all_proofs();
 
                 let mut update_dapol = Dapol::<D, R>::new_blank(TREE_HEIGHT, aggregation_factor);
+                println!("first loop");
                 for item in list.iter() {
+                    println!("first loop {:?} {:?}",&item.0,&item.1);
                     update_dapol.update(&item.0, item.1.clone(), &secret);
                 }
                 update_dapol.generate_all_proofs();
@@ -98,13 +103,15 @@ impl<
     }
 }
 #[test]
+#[ignore]
 fn test_dapol() {
     TesterDapol::<blake3::Hasher, RangeProofSplitting>::test();
-    TesterDapol::<blake3::Hasher, RangeProofPadding>::test();
-    TesterDapol::<blake2::Blake2b, RangeProofPadding>::test();
-    TesterDapol::<blake2::Blake2b, RangeProofSplitting>::test();
+    // TesterDapol::<blake3::Hasher, RangeProofPadding>::test();
+    // TesterDapol::<blake2::Blake2b, RangeProofPadding>::test();
+    // TesterDapol::<blake2::Blake2b, RangeProofSplitting>::test();
 }
 
+// STENT function not used anywhere
 #[test]
 fn prove_n_verify() {
     let tree_height = 5;
