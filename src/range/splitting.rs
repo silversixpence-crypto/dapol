@@ -4,14 +4,12 @@ use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
 use smtree::{
     error::DecodingError,
     traits::{Serializable, TypeName},
-    utils::usize_to_bytes,
 };
 
 use super::{
     deserialize_aggregated_proof, deserialize_individual_proofs, generate_aggregated_range_proof,
     generate_single_range_proof, verify_aggregated_range_proof, verify_single_range_proof,
-    RangeProvable, RangeVerifiable, AGGREGATED_NUM_BYTE_NUM, INDIVIDUAL_NUM_BYTE_NUM,
-    PROOF_SIZE_BYTE_NUM,
+    RangeProvable, RangeVerifiable, AGGREGATED_NUM_BYTE_NUM,
 };
 
 // RANGE PROOF SPLITTING
@@ -38,20 +36,20 @@ impl Serializable for RangeProofSplitting {
     fn serialize(&self) -> Vec<u8> {
         let mut result = Vec::new();
         // append aggregated proofs to the result
-        result.append(&mut usize_to_bytes(
-            self.get_aggregated().len(),
-            AGGREGATED_NUM_BYTE_NUM,
-        ));
+        result.append(&mut self.get_individual().len()
+        .to_le_bytes()
+        .to_vec()
+        );
         for proof in self.get_aggregated() {
             let mut bytes = proof.to_bytes();
-            result.append(&mut usize_to_bytes(bytes.len(), PROOF_SIZE_BYTE_NUM));
+            result.append(&mut bytes.len().to_le_bytes().to_vec());
             result.append(&mut bytes);
         }
         // append individual proofs to the result
-        result.append(&mut usize_to_bytes(
-            self.get_individual().len(),
-            INDIVIDUAL_NUM_BYTE_NUM,
-        ));
+        result.append(&mut self.get_individual().len()
+        .to_le_bytes()
+        .to_vec()
+        );
         for proof in self.get_individual() {
             result.append(&mut proof.to_bytes());
         }
