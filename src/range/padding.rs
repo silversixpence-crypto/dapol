@@ -39,7 +39,9 @@ impl Serializable for RangeProofPadding {
     fn serialize(&self) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
         let mut bytes = self.get_aggregated().to_bytes();
-        result.append(&mut bytes.len().to_le_bytes().to_vec());
+        result.append(&mut bytes.len()
+        .to_le_bytes()
+        .to_vec());
         result.append(&mut bytes);
         result.append(&mut self.get_individual().len()
         .to_le_bytes()
