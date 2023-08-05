@@ -4,7 +4,7 @@ use smtree::{
 };
 
 #[test]
-fn test_serialization() {
+fn test_new_serialization() {
     let tree_height = 8;
     let num_leaves = 20;
     let batch_size = 10;
