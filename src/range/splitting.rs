@@ -5,6 +5,7 @@ use smtree::{
     error::DecodingError,
     traits::{Serializable, TypeName},
 };
+use byteorder::{LittleEndian, ByteOrder};
 
 use super::{
     deserialize_aggregated_proof, deserialize_individual_proofs, generate_aggregated_range_proof,
@@ -36,10 +37,10 @@ impl Serializable for RangeProofSplitting {
     fn serialize(&self) -> Vec<u8> {
         let mut result = Vec::new();
         // append aggregated proofs to the result
-        result.append(&mut self.get_individual().len()
-        .to_le_bytes()
-        .to_vec()
-        );
+        let len = self.get_individual().len() as u16;  // Ensure the length fits into 2 bytes
+        let mut buf = [0; 2];
+        LittleEndian::write_u16(&mut buf, len);
+        result.extend_from_slice(&buf);
         for proof in self.get_aggregated() {
             let mut bytes = proof.to_bytes();
             result.append(&mut bytes.len().to_le_bytes().to_vec());
