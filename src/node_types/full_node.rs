@@ -6,18 +6,11 @@
 //! the serialization process since it will increase the final byte size and expose the secret
 //! values.
 
-use crate::binary_tree::{Mergeable};
+use crate::binary_tree::Mergeable;
 
-use crate::DapolProofNode;
 use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use digest::Digest;
-use rand::{thread_rng, Rng};
-use smtree::{
-    index::TreeIndex,
-    pad_secret::Secret,
-    traits::{Mergeable, Paddable, ProofExtractable, Rand, TypeName},
-};
 use std::marker::PhantomData;
 
 // DAPOL NODE
@@ -30,20 +23,21 @@ pub struct FullNodeContent<D> {
     liability: u64,
     blinding_factor: Scalar,
     commitment: RistrettoPoint,
-    hash: Vec<u8>,
-    _phantom_hash_function: PhantomData<D>,
+    hash: Vec<u8>, // STENT TODO this will need to change to H256 or whatever
+    _phantom_hash_function: PhantomData<D>, // STENT TODO is this needed?
 }
 
 impl<D: Digest> FullNodeContent<D> {
-    /// The constructor.
+    /// Constructor.
     pub fn new(value: u64, blinding_factor: Scalar) -> FullNodeContent<D> {
         // compute the Pedersen commitment to the value
         let commitment = PedersenGens::default().commit(Scalar::from(value), blinding_factor);
 
         // compute the hash as the hashing of the commitment
         let mut hasher = D::new();
-        hasher.update(&(commitment.compress().as_bytes().to_vec()));
-        let hash = hasher.finalize().to_vec();
+        hasher.update(&(commitment.compress().as_bytes()));
+        let hash = hasher.finalize().to_vec(); // STENT TODO change to below
+                                               //hasher.finalize_as_h256() // STENT TODO double check the output of this thing
 
         FullNodeContent {
             liability: value,
@@ -66,7 +60,7 @@ impl<D: Digest> FullNodeContent<D> {
 }
 
 impl<D: Digest> Mergeable for FullNodeContent<D> {
-    /// Returns the parent node by merging two child nodes.
+    /// Returns the parent node content by merging two child nodes.
     ///
     /// The value and blinding factor of the parent are the sums of the two children respectively.
     /// The commitment of the parent is the homomorphic sum of the two children.
@@ -79,7 +73,6 @@ impl<D: Digest> Mergeable for FullNodeContent<D> {
         hasher.update(&lch.hash);
         hasher.update(&rch.hash);
 
-        // V/B/C(parent) = V/B/C(L) + V/B/C(R)
         FullNodeContent {
             liability: lch.liability + rch.liability,
             blinding_factor: lch.blinding_factor + rch.blinding_factor,
@@ -90,43 +83,105 @@ impl<D: Digest> Mergeable for FullNodeContent<D> {
     }
 }
 
-impl<D: Digest> Paddable for FullNodeContent<D> {
-    /// Returns a padding node with value 0 and a random blinding factor.
-    /// TODO: check with Kostas if this padding is ok.
-    fn padding(_idx: &TreeIndex, _secret: &Secret) -> FullNodeContent<D> {
-        FullNodeContent::<D>::new(0, Scalar::random(&mut thread_rng()))
+// STENT TODO should fuzz the values instead of hard-coding
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // STENT TODO this seems a bit hacky, maybe there is a better way?
+    // NOTE this is only for little endian bytes, which Scalar uses
+    fn extend_bytes(bytes: [u8; 8]) -> [u8; 32] {
+        let mut new_bytes = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0,
+        ];
+        for i in 0..bytes.len() {
+            new_bytes[i] = bytes[i];
+        }
+        new_bytes
+    }
+
+    #[test]
+    fn constructor_works() {
+        let liability = 11u64;
+        let mut blinding_factor = 7u64;
+        FullNodeContent::<blake3::Hasher>::new(
+            liability,
+            Scalar::from_canonical_bytes(extend_bytes(blinding_factor.to_le_bytes())).unwrap(),
+        );
+    }
+
+    #[test]
+    fn merge_works() {
+        let liability_1 = 11u64;
+        let mut blinding_factor_1 = 7u64;
+        let node_1 = FullNodeContent::<blake3::Hasher>::new(
+            liability_1,
+            Scalar::from_canonical_bytes(extend_bytes(blinding_factor_1.to_le_bytes())).unwrap(),
+        );
+
+        let liability_2 = 11u64;
+        let mut blinding_factor_2 = 7u64;
+        let node_2 = FullNodeContent::<blake3::Hasher>::new(
+            liability_2,
+            Scalar::from_canonical_bytes(extend_bytes(blinding_factor_2.to_le_bytes())).unwrap(),
+        );
+
+        FullNodeContent::merge(&node_1, &node_2);
     }
 }
 
-impl<D> ProofExtractable for FullNodeContent<D> {
-    type ProofNode = DapolProofNode<D>;
-    fn get_proof_node(&self) -> Self::ProofNode {
-        DapolProofNode::new(self.commitment, self.hash.clone())
-    }
-}
+// =================================================
+// can probably remove all this
 
-// TODO: this seems to be used for testing purposes only
-impl<D: Digest> Rand for FullNodeContent<D> {
-    /// Randomly generates a DAPOL node with random value and random blinding factor.
-    fn randomize(&mut self) {
-        // The value shouldn't be generated as u64 to prevent overflow of sums.
-        let tmp: u32 = thread_rng().gen();
-        *self = FullNodeContent::<D>::new(tmp as u64, Scalar::random(&mut thread_rng()));
-    }
-}
+// use smtree::{
+//     index::TreeIndex,
+//     pad_secret::Secret,
+//     traits::{Paddable, ProofExtractable, Rand, TypeName},
+// };
+// use rand::{thread_rng, Rng};
 
-impl<D: TypeName> TypeName for FullNodeContent<D> {
-    /// Returns the type name of DAPOL nodes with corresponding hash function (for logging purpose).
-    fn get_name() -> String {
-        format!("DAPOL Node ({})", D::get_name())
-    }
-}
+// STENT TODO this is not needed anymore, the padding function definition should live somewhere else
+// impl<D: Digest> Paddable for FullNodeContent<D> {
+//     /// Returns a padding node with value 0 and a random blinding factor.
+//     /// TODO: check with Kostas if this padding is ok.
+//     fn padding(_idx: &TreeIndex, _secret: &Secret) -> FullNodeContent<D> {
+//         FullNodeContent::<D>::new(0, Scalar::random(&mut thread_rng()))
+//     }
+// }
 
-impl<D> PartialEq for FullNodeContent<D> {
-    /// Two DAPOL nodes are considered equal iff the values are equal.
-    fn eq(&self, other: &Self) -> bool {
-        self.liability == other.liability
-    }
-}
+// STENT TODO this conversion does need to happen but not sure how I want to do it yet
+//   most likely the tree code will have a conversion function that takes a generic C' type
+//   that implements the convert_node trait or something, then can define convert_node here
+// impl<D> ProofExtractable for FullNodeContent<D> {
+//     type ProofNode = DapolProofNode<D>;
+//     fn get_proof_node(&self) -> Self::ProofNode {
+//         DapolProofNode::new(self.commitment, self.hash.clone())
+//     }
+// }
 
-impl<D> Eq for FullNodeContent<D> {}
+// STENT TODO not sure we need this anymore, seems to only be used for testing
+// impl<D: Digest> Rand for FullNodeContent<D> {
+//     /// Randomly generates a DAPOL node with random value and random blinding factor.
+//     fn randomize(&mut self) {
+//         // The value shouldn't be generated as u64 to prevent overflow of sums.
+//         let tmp: u32 = thread_rng().gen();
+//         *self = FullNodeContent::<D>::new(tmp as u64, Scalar::random(&mut thread_rng()));
+//     }
+// }
+
+// // STENT TODO why do we need this?
+// impl<D: TypeName> TypeName for FullNodeContent<D> {
+//     /// Returns the type name of DAPOL nodes with corresponding hash function (for logging purpose).
+//     fn get_name() -> String {
+//         format!("DAPOL Node ({})", D::get_name())
+//     }
+// }
+
+// // STENT TODO why partial eq defined like this? what is partial eq actually supposed to do?
+// impl<D> PartialEq for FullNodeContent<D> {
+//     /// Two DAPOL nodes are considered equal iff the values are equal.
+//     fn eq(&self, other: &Self) -> bool {
+//         self.liability == other.liability
+//     }
+// }
