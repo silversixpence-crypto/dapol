@@ -3,6 +3,8 @@
 use curve25519_dalek_ng::ristretto::RistrettoPoint;
 use digest::Digest;
 use std::marker::PhantomData;
+use primitive_types::H256;
+
 use crate::binary_tree::Mergeable;
 
 #[derive(Default, Clone, Debug)]
@@ -18,6 +20,7 @@ impl<H> PartialEq for DapolNodeContent<H> {
     }
 }
 
+// STENT TODO is this the best method for doing this?
 pub trait H256Convertable {
     fn finalize_as_h256(&self) -> H256;
 }
@@ -51,14 +54,6 @@ impl<H: Digest + H256Convertable> Mergeable for DapolNodeContent<H> {
     }
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq)]
-pub struct H256([u8; 32]);
-
-impl H256 {
-    fn as_bytes(&self) -> &[u8; 32] {
-        &self.0
-    }
-}
 
 // #[cfg(test)]
 // mod tests {
