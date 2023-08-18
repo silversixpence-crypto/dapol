@@ -1,4 +1,5 @@
 //! An implementation of the content generic type required for [crate][binary_tree][`Node<C>`].
+//!
 //! This implementation contains the values in the [super][TODO link to compressed] implementation
 //! (Pedersen commitment & hash) plus the additional private values (blinding factor and plain text
 //! liability). The private values are included so that the total blinding factor & liability sum
