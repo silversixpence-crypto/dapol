@@ -26,107 +26,107 @@ use std::marker::PhantomData;
 /// A node of the DAPOL tree, consisting of the value, the blinding factor,
 /// the Pedersen commitment and the hash.
 #[derive(Default, Clone, Debug)]
-pub struct DapolNode<D> {
-    v: u64,                                 // The value.
-    v_blinding: Scalar,                     // The blinding factor.
-    com: RistrettoPoint,                    // The Pedersen commitment.
-    hash: Vec<u8>,                          // The hash.
-    _phantom_hash_function: PhantomData<D>, // The hash function.
+pub struct FullNodeContent<D> {
+    liability: u64,
+    blinding_factor: Scalar,
+    commitment: RistrettoPoint,
+    hash: Vec<u8>,
+    _phantom_hash_function: PhantomData<D>,
 }
 
-impl<D: Digest> DapolNode<D> {
+impl<D: Digest> FullNodeContent<D> {
     /// The constructor.
-    pub fn new(value: u64, v_blinding: Scalar) -> DapolNode<D> {
+    pub fn new(value: u64, blinding_factor: Scalar) -> FullNodeContent<D> {
         // compute the Pedersen commitment to the value
-        let com = PedersenGens::default().commit(Scalar::from(value), v_blinding);
+        let commitment = PedersenGens::default().commit(Scalar::from(value), blinding_factor);
 
         // compute the hash as the hashing of the commitment
         let mut hasher = D::new();
-        hasher.update(&(com.compress().as_bytes().to_vec()));
+        hasher.update(&(commitment.compress().as_bytes().to_vec()));
         let hash = hasher.finalize().to_vec();
 
-        DapolNode {
-            v: value,
-            v_blinding,
-            com,
+        FullNodeContent {
+            liability: value,
+            blinding_factor,
+            commitment,
             hash,
             _phantom_hash_function: PhantomData,
         }
     }
 
-    /// Returns the value of the DAPOL node.
-    pub fn get_value(&self) -> u64 {
-        self.v
+    /// Returns the liability of this node.
+    pub fn get_liability(&self) -> u64 {
+        self.liability
     }
 
-    /// Returns the blinding factor of the DAPOL node.
-    pub fn get_blinding(&self) -> Scalar {
-        self.v_blinding
+    /// Returns the blinding factor of this node.
+    pub fn get_blinding_factor(&self) -> Scalar {
+        self.blinding_factor
     }
 }
 
-impl<D: Digest> Mergeable for DapolNode<D> {
+impl<D: Digest> Mergeable for FullNodeContent<D> {
     /// Returns the parent node by merging two child nodes.
     ///
     /// The value and blinding factor of the parent are the sums of the two children respectively.
     /// The commitment of the parent is the homomorphic sum of the two children.
     /// The hash of the parent is computed by hashing the concatenated commitments and hashes of two children.
-    fn merge(lch: &DapolNode<D>, rch: &DapolNode<D>) -> DapolNode<D> {
+    fn merge(lch: &FullNodeContent<D>, rch: &FullNodeContent<D>) -> FullNodeContent<D> {
         // H(parent) = Hash(C(L) || C(R) || H(L) || H(R))
         let mut hasher = D::new();
-        hasher.update(lch.com.compress().as_bytes());
-        hasher.update(rch.com.compress().as_bytes());
+        hasher.update(lch.commitment.compress().as_bytes());
+        hasher.update(rch.commitment.compress().as_bytes());
         hasher.update(&lch.hash);
         hasher.update(&rch.hash);
 
         // V/B/C(parent) = V/B/C(L) + V/B/C(R)
-        DapolNode {
-            v: lch.v + rch.v,
-            v_blinding: lch.v_blinding + rch.v_blinding,
-            com: lch.com + rch.com,
+        FullNodeContent {
+            liability: lch.liability + rch.liability,
+            blinding_factor: lch.blinding_factor + rch.blinding_factor,
+            commitment: lch.commitment + rch.commitment,
             hash: hasher.finalize().to_vec(),
             _phantom_hash_function: PhantomData,
         }
     }
 }
 
-impl<D: Digest> Paddable for DapolNode<D> {
+impl<D: Digest> Paddable for FullNodeContent<D> {
     /// Returns a padding node with value 0 and a random blinding factor.
     /// TODO: check with Kostas if this padding is ok.
-    fn padding(_idx: &TreeIndex, _secret: &Secret) -> DapolNode<D> {
-        DapolNode::<D>::new(0, Scalar::random(&mut thread_rng()))
+    fn padding(_idx: &TreeIndex, _secret: &Secret) -> FullNodeContent<D> {
+        FullNodeContent::<D>::new(0, Scalar::random(&mut thread_rng()))
     }
 }
 
-impl<D> ProofExtractable for DapolNode<D> {
+impl<D> ProofExtractable for FullNodeContent<D> {
     type ProofNode = DapolProofNode<D>;
     fn get_proof_node(&self) -> Self::ProofNode {
-        DapolProofNode::new(self.com, self.hash.clone())
+        DapolProofNode::new(self.commitment, self.hash.clone())
     }
 }
 
 // TODO: this seems to be used for testing purposes only
-impl<D: Digest> Rand for DapolNode<D> {
+impl<D: Digest> Rand for FullNodeContent<D> {
     /// Randomly generates a DAPOL node with random value and random blinding factor.
     fn randomize(&mut self) {
         // The value shouldn't be generated as u64 to prevent overflow of sums.
         let tmp: u32 = thread_rng().gen();
-        *self = DapolNode::<D>::new(tmp as u64, Scalar::random(&mut thread_rng()));
+        *self = FullNodeContent::<D>::new(tmp as u64, Scalar::random(&mut thread_rng()));
     }
 }
 
-impl<D: TypeName> TypeName for DapolNode<D> {
+impl<D: TypeName> TypeName for FullNodeContent<D> {
     /// Returns the type name of DAPOL nodes with corresponding hash function (for logging purpose).
     fn get_name() -> String {
         format!("DAPOL Node ({})", D::get_name())
     }
 }
 
-impl<D> PartialEq for DapolNode<D> {
+impl<D> PartialEq for FullNodeContent<D> {
     /// Two DAPOL nodes are considered equal iff the values are equal.
     fn eq(&self, other: &Self) -> bool {
-        self.v == other.v
+        self.liability == other.liability
     }
 }
 
-impl<D> Eq for DapolNode<D> {}
+impl<D> Eq for FullNodeContent<D> {}
