@@ -2,10 +2,10 @@
 //!
 //! This implementation contains only the Pedersen commitment and the hash as fields in the struct.
 
-use curve25519_dalek_ng::{ristretto:: RistrettoPoint, scalar::Scalar };
+use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use digest::Digest;
-use std::marker::PhantomData;
 use primitive_types::H256;
+use std::marker::PhantomData;
 
 use crate::binary_tree::Mergeable;
 
@@ -31,11 +31,19 @@ impl<H: Digest + H256Convertable> CompressedNodeContent<H> {
     /// The `blinding_factor` needs to have a larger sized storage space (256 bits) ensure promised
     /// n-bit security of the commitments; it can be enlarged to 512 bits if need be as this size
     /// is supported by the underlying `Scalar` constructors.
-    pub fn new_leaf(value: u64, blinding_factor: [u8; 32], user_id: [u8; 32], user_salt: [u8; 32]) -> CompressedNodeContent<H> {
+    pub fn new_leaf(
+        value: u64,
+        blinding_factor: [u8; 32],
+        user_id: [u8; 32],
+        user_salt: [u8; 32],
+    ) -> CompressedNodeContent<H> {
         use bulletproofs::PedersenGens;
 
         // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
-        let commitment = PedersenGens::default().commit(Scalar::from(value), Scalar::from_bytes_mod_order(blinding_factor));
+        let commitment = PedersenGens::default().commit(
+            Scalar::from(value),
+            Scalar::from_bytes_mod_order(blinding_factor),
+        );
 
         // Compute the hash: `H("leaf" | user_id | user_salt)`
         let mut hasher = H::new();
@@ -86,69 +94,66 @@ impl<H: Digest + H256Convertable> Mergeable for CompressedNodeContent<H> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use std::convert::TryInto;
 
-// #[cfg(test)]
-// mod tests {
-//     use bulletproofs::PedersenGens;
-//     use curve25519_dalek_ng::scalar::Scalar;
+    use super::*;
 
-//     use super::*;
+    /// This is only for little endian bytes, which `Scalar` uses.
+    fn extend_to_u8_32<const A: usize, const B: usize>(arr: [u8; A]) -> [u8; B] {
+        assert!(B >= A); //just for a nicer error message, adding #[track_caller] to the function may also be desirable
+        let mut b = [0; B];
+        b[..A].copy_from_slice(&arr);
+        b
+    }
 
-//     #[test]
-//     pub fn stent_tree_test() {
-//         let height = 4;
-//         let v_blinding = Scalar::from(8_u32);
+    // https://stackoverflow.com/questions/71642583/rust-convert-str-to-fixedslices-array-of-u8
+    fn str_to_u8_32(str: &str) -> [u8; 32] {
+        let mut arr = [0u8; 32];
+        arr[..str.len()].copy_from_slice(str.as_bytes());
+        arr
+    }
 
-//         let new_padding_node_content = |coord: &Coordinate| -> CompressedNodeContent<blake3::Hasher> {
-//             CompressedNodeContent {
-//                 commitment: PedersenGens::default()
-//                     .commit(Scalar::from(3_u32), Scalar::from(0_u32)),
-//                 hash: H256::default(),
-//                 _phantom_hash_function: PhantomData,
-//             }
-//         };
+    #[test]
+    fn constructor_works() {
+        let liability = 11u64;
+        let blinding_factor = extend_to_u8_32(7u64.to_le_bytes());
+        let user_id = str_to_u8_32("some user");
+        let user_salt = str_to_u8_32("some salt");
 
-//         let leaf_1 = InputLeafNode::<CompressedNodeContent<blake3::Hasher>> {
-//             x_coord: 0,
-//             content: CompressedNodeContent {
-//                 hash: H256::default(),
-//                 commitment: PedersenGens::default().commit(Scalar::from(0_u32), v_blinding),
-//                 _phantom_hash_function: PhantomData,
-//             },
-//         };
-//         let leaf_2 = InputLeafNode::<CompressedNodeContent<blake3::Hasher>> {
-//             x_coord: 4,
-//             content: CompressedNodeContent {
-//                 hash: H256::default(),
-//                 commitment: PedersenGens::default().commit(Scalar::from(2_u32), v_blinding),
-//                 _phantom_hash_function: PhantomData,
-//             },
-//         };
-//         let leaf_3 = InputLeafNode::<CompressedNodeContent<blake3::Hasher>> {
-//             x_coord: 7,
-//             content: CompressedNodeContent {
-//                 hash: H256::default(),
-//                 commitment: PedersenGens::default().commit(Scalar::from(3_u32), v_blinding),
-//                 _phantom_hash_function: PhantomData,
-//             },
-//         };
-//         let input = vec![leaf_1, leaf_2, leaf_3];
-//         let tree = SparseSummationMerkleTree::new(input, height, &new_padding_node_content);
-//         for item in &tree.store {
-//             println!("coord {:?} hash {:?}", item.1.coord, item.1.content.hash);
-//         }
+        CompressedNodeContent::<blake3::Hasher>::new_leaf(
+            liability,
+            blinding_factor,
+            user_id,
+            user_salt,
+        );
+    }
 
-//         println!("\n");
+    #[test]
+    fn merge_works() {
+        let liability_1 = 11u64;
+        let blinding_factor_1 = extend_to_u8_32(7u64.to_le_bytes());
+        let user_id_1 = str_to_u8_32("some user 1");
+        let user_salt_1 = str_to_u8_32("some salt 1");
+        let node_1 = CompressedNodeContent::<blake3::Hasher>::new_leaf(
+            liability_1,
+            blinding_factor_1,
+            user_id_1,
+            user_salt_1,
+        );
 
-//         let proof = tree.create_inclusion_proof(0);
-//         for item in &proof.siblings {
-//             println!(
-//                 "coord {:?} value {:?} hash {:?}",
-//                 item.coord, item.content.commitment, item.content.hash
-//             );
-//         }
+        let liability_2 = 11u64;
+        let blinding_factor_2 = extend_to_u8_32(7u64.to_le_bytes());
+        let user_id_2 = str_to_u8_32("some user 1");
+        let user_salt_2 = str_to_u8_32("some salt 1");
+        let node_2 = CompressedNodeContent::<blake3::Hasher>::new_leaf(
+            liability_2,
+            blinding_factor_2,
+            user_id_2,
+            user_salt_2,
+        );
 
-//         println!("\n");
-//         proof.verify();
-//     }
-// }
+        CompressedNodeContent::merge(&node_1, &node_2);
+    }
+}

@@ -11,8 +11,8 @@ use crate::binary_tree::Mergeable;
 
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use digest::Digest;
-use std::marker::PhantomData;
 use primitive_types::H256;
+use std::marker::PhantomData;
 
 use super::compressed_node::H256Convertable;
 
@@ -39,13 +39,21 @@ impl<H: Digest + H256Convertable> FullNodeContent<H> {
     /// The `blinding_factor` needs to have a larger sized storage space (256 bits) ensure promised
     /// n-bit security of the commitments; it can be enlarged to 512 bits if need be as this size
     /// is supported by the underlying `Scalar` constructors.
-    pub fn new_leaf(value: u64, blinding_factor: [u8; 32], user_id: [u8; 32], user_salt: [u8; 32]) -> FullNodeContent<H> {
+    pub fn new_leaf(
+        value: u64,
+        blinding_factor: [u8; 32],
+        user_id: [u8; 32],
+        user_salt: [u8; 32],
+    ) -> FullNodeContent<H> {
         use bulletproofs::PedersenGens;
 
         let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor);
 
         // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
-        let commitment = PedersenGens::default().commit(Scalar::from(value), Scalar::from_bytes_mod_order(blinding_factor));
+        let commitment = PedersenGens::default().commit(
+            Scalar::from(value),
+            Scalar::from_bytes_mod_order(blinding_factor),
+        );
 
         // Compute the hash: `H("leaf" | user_id | user_salt)`
         let mut hasher = H::new();
@@ -98,48 +106,62 @@ impl<H: Digest + H256Convertable> Mergeable for FullNodeContent<H> {
     }
 }
 
-// STENT TODO should fuzz the values instead of hard-coding
+// TODO should fuzz the values instead of hard-coding
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // STENT TODO this seems a bit hacky, maybe there is a better way?
-    // NOTE this is only for little endian bytes, which Scalar uses
-    fn extend_bytes(bytes: [u8; 8]) -> [u8; 32] {
-        let mut new_bytes = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0,
-        ];
-        for i in 0..bytes.len() {
-            new_bytes[i] = bytes[i];
-        }
-        new_bytes
+    fn extend_to_u8_32<const A: usize, const B: usize>(arr: [u8; A]) -> [u8; B] {
+        assert!(B >= A); //just for a nicer error message, adding #[track_caller] to the function may also be desirable
+        let mut b = [0; B];
+        b[..A].copy_from_slice(&arr);
+        b
+    }
+
+    // https://stackoverflow.com/questions/71642583/rust-convert-str-to-fixedslices-array-of-u8
+    fn to_u8_32(str: &str) -> [u8; 32] {
+        let mut arr = [0u8; 32];
+        arr[..str.len()].copy_from_slice(str.as_bytes());
+        arr
     }
 
     #[test]
     fn constructor_works() {
         let liability = 11u64;
-        let mut blinding_factor = 7u64;
-        FullNodeContent::<blake3::Hasher>::new(
+        let blinding_factor = extend_to_u8_32(7u64.to_le_bytes());
+        let user_id = to_u8_32("some user");
+        let user_salt = to_u8_32("some salt");
+
+        FullNodeContent::<blake3::Hasher>::new_leaf(
             liability,
-            extend_bytes(blinding_factor.to_le_bytes()),
+            blinding_factor,
+            user_id,
+            user_salt,
         );
     }
 
     #[test]
     fn merge_works() {
         let liability_1 = 11u64;
-        let mut blinding_factor_1 = 7u64;
-        let node_1 = FullNodeContent::<blake3::Hasher>::new(
+        let blinding_factor_1 = extend_to_u8_32(7u64.to_le_bytes());
+        let user_id_1 = to_u8_32("some user 1");
+        let user_salt_1 = to_u8_32("some salt 1");
+        let node_1 = FullNodeContent::<blake3::Hasher>::new_leaf(
             liability_1,
-            extend_bytes(blinding_factor_1.to_le_bytes()),
+            blinding_factor_1,
+            user_id_1,
+            user_salt_1,
         );
 
         let liability_2 = 11u64;
-        let mut blinding_factor_2 = 7u64;
-        let node_2 = FullNodeContent::<blake3::Hasher>::new(
+        let blinding_factor_2 = extend_to_u8_32(7u64.to_le_bytes());
+        let user_id_2 = to_u8_32("some user 1");
+        let user_salt_2 = to_u8_32("some salt 1");
+        let node_2 = FullNodeContent::<blake3::Hasher>::new_leaf(
             liability_2,
-            extend_bytes(blinding_factor_2.to_le_bytes()),
+            blinding_factor_2,
+            user_id_2,
+            user_salt_2,
         );
 
         FullNodeContent::merge(&node_1, &node_2);
