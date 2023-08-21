@@ -14,6 +14,8 @@ use digest::Digest;
 use std::marker::PhantomData;
 use primitive_types::H256;
 
+use super::compressed_node::H256Convertable;
+
 // DAPOL NODE
 // ================================================================================================
 
@@ -24,12 +26,11 @@ pub struct FullNodeContent<H> {
     liability: u64,
     blinding_factor: Scalar,
     commitment: RistrettoPoint,
-    hash: Vec<u8>, // STENT TODO this will need to change to H256 or whatever
+    hash: H256,
     _phantom_hash_function: PhantomData<H>, // STENT TODO is this needed?
 }
 
-// STENT TODO change D to H
-impl<H: Digest> FullNodeContent<H> {
+impl<H: Digest + H256Convertable> FullNodeContent<H> {
     /// Constructor.
     pub fn new(value: u64, blinding_factor: Scalar) -> FullNodeContent<H> {
         use bulletproofs::PedersenGens;
@@ -39,8 +40,7 @@ impl<H: Digest> FullNodeContent<H> {
         // compute the hash as the hashing of the commitment
         let mut hasher = H::new();
         hasher.update(&(commitment.compress().as_bytes()));
-        let hash = hasher.finalize().to_vec(); // STENT TODO change to below
-                                               //hasher.finalize_as_h256() // STENT TODO double check the output of this thing
+        let hash = hasher.finalize_as_h256(); // STENT TODO double check the output of this thing
 
         FullNodeContent {
             liability: value,
@@ -62,7 +62,7 @@ impl<H: Digest> FullNodeContent<H> {
     }
 }
 
-impl<H: Digest> Mergeable for FullNodeContent<H> {
+impl<H: Digest + H256Convertable> Mergeable for FullNodeContent<H> {
     /// Returns the parent node content by merging two child nodes.
     ///
     /// The value and blinding factor of the parent are the sums of the two children respectively.
@@ -80,7 +80,7 @@ impl<H: Digest> Mergeable for FullNodeContent<H> {
             liability: lch.liability + rch.liability,
             blinding_factor: lch.blinding_factor + rch.blinding_factor,
             commitment: lch.commitment + rch.commitment,
-            hash: hasher.finalize().to_vec(),
+            hash: hasher.finalize_as_h256(),
             _phantom_hash_function: PhantomData,
         }
     }
