@@ -3,7 +3,6 @@
 //! This implementation contains only the Pedersen commitment and the hash as fields in the struct.
 
 use curve25519_dalek_ng::{ristretto:: RistrettoPoint, scalar::Scalar };
-use bulletproofs::PedersenGens;
 use digest::Digest;
 use std::marker::PhantomData;
 use primitive_types::H256;
@@ -25,10 +24,18 @@ pub struct CompressedNodeContent<H> {
 
 impl<H: Digest + H256Convertable> CompressedNodeContent<H> {
     /// Constructor.
-    // STENT TODO why have value as u64 and blinding factor as scalar? As apposed to both Scalar
-    pub fn new(value: u64, blinding_factor: Scalar) -> CompressedNodeContent<H> {
+    ///
+    /// The secret `value` realistically does not need more space than 64 bits because it is
+    /// generally used for monetary value or head count, also the Bulletproofs library requires
+    /// the value to be u64.
+    /// The `blinding_factor` needs to have a larger sized storage space (256 bits) ensure promised
+    /// n-bit security of the commitments; it can be enlarged to 512 bits if need be as this size
+    /// is supported by the underlying `Scalar` constructors.
+    pub fn new(value: u64, blinding_factor: [u8; 32]) -> CompressedNodeContent<H> {
+        use bulletproofs::PedersenGens;
+
         // compute the Pedersen commitment to the value
-        let commitment = PedersenGens::default().commit(Scalar::from(value), blinding_factor);
+        let commitment = PedersenGens::default().commit(Scalar::from(value), Scalar::from_bytes_mod_order(blinding_factor));
 
         // compute the hash as the hashing of the commitment
         // STENT TODO this hash is not correct, it needs to contain the id and s values

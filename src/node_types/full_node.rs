@@ -32,12 +32,20 @@ pub struct FullNodeContent<H> {
 
 impl<H: Digest + H256Convertable> FullNodeContent<H> {
     /// Constructor.
-    // STENT TODO why have value as u64 and blinding factor as scalar? As apposed to both Scalar
-    pub fn new(value: u64, blinding_factor: Scalar) -> FullNodeContent<H> {
+    ///
+    /// The secret `value` realistically does not need more space than 64 bits because it is
+    /// generally used for monetary value or head count, also the Bulletproofs library requires
+    /// the value to be u64.
+    /// The `blinding_factor` needs to have a larger sized storage space (256 bits) ensure promised
+    /// n-bit security of the commitments; it can be enlarged to 512 bits if need be as this size
+    /// is supported by the underlying `Scalar` constructors.
+    pub fn new(value: u64, blinding_factor: [u8; 32]) -> FullNodeContent<H> {
         use bulletproofs::PedersenGens;
 
+        let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor);
+
         // compute the Pedersen commitment to the value
-        let commitment = PedersenGens::default().commit(Scalar::from(value), blinding_factor);
+        let commitment = PedersenGens::default().commit(Scalar::from(value), blinding_factor_scalar.clone());
 
         // compute the hash as the hashing of the commitment
         let mut hasher = H::new();
@@ -46,7 +54,7 @@ impl<H: Digest + H256Convertable> FullNodeContent<H> {
 
         FullNodeContent {
             liability: value,
-            blinding_factor,
+            blinding_factor: blinding_factor_scalar,
             commitment,
             hash,
             _phantom_hash_function: PhantomData,
@@ -112,7 +120,7 @@ mod tests {
         let mut blinding_factor = 7u64;
         FullNodeContent::<blake3::Hasher>::new(
             liability,
-            Scalar::from_canonical_bytes(extend_bytes(blinding_factor.to_le_bytes())).unwrap(),
+            extend_bytes(blinding_factor.to_le_bytes()),
         );
     }
 
@@ -122,14 +130,14 @@ mod tests {
         let mut blinding_factor_1 = 7u64;
         let node_1 = FullNodeContent::<blake3::Hasher>::new(
             liability_1,
-            Scalar::from_canonical_bytes(extend_bytes(blinding_factor_1.to_le_bytes())).unwrap(),
+            extend_bytes(blinding_factor_1.to_le_bytes()),
         );
 
         let liability_2 = 11u64;
         let mut blinding_factor_2 = 7u64;
         let node_2 = FullNodeContent::<blake3::Hasher>::new(
             liability_2,
-            Scalar::from_canonical_bytes(extend_bytes(blinding_factor_2.to_le_bytes())).unwrap(),
+            extend_bytes(blinding_factor_2.to_le_bytes()),
         );
 
         FullNodeContent::merge(&node_1, &node_2);
