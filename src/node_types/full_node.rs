@@ -32,8 +32,10 @@ pub struct FullNodeContent<H> {
 
 impl<H: Digest + H256Convertable> FullNodeContent<H> {
     /// Constructor.
+    // STENT TODO why have value as u64 and blinding factor as scalar? As apposed to both Scalar
     pub fn new(value: u64, blinding_factor: Scalar) -> FullNodeContent<H> {
         use bulletproofs::PedersenGens;
+
         // compute the Pedersen commitment to the value
         let commitment = PedersenGens::default().commit(Scalar::from(value), blinding_factor);
 

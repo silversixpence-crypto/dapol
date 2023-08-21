@@ -10,6 +10,12 @@ use primitive_types::H256;
 
 use crate::binary_tree::Mergeable;
 
+/// Main struct containing the Pedersen commitment & hash.
+///
+/// The hash function needs to be a generic parameter because when implementing
+/// [crate][binary_tree][`Mergeable`] one needs to define the merge function, is not generic
+/// and the merge function in this case needs to use a generic hash function. One way to
+/// solve this is to have a generic parameter on this struct and a phantom field.
 #[derive(Default, Clone, Debug)]
 pub struct CompressedNodeContent<H> {
     commitment: RistrettoPoint,
