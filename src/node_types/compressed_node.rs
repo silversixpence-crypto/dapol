@@ -17,16 +17,17 @@ pub struct CompressedNodeContent<H> {
     _phantom_hash_function: PhantomData<H>,
 }
 
-impl<D: Digest + H256Convertable> CompressedNodeContent<D> {
+impl<H: Digest + H256Convertable> CompressedNodeContent<H> {
     /// Constructor.
-    pub fn new(value: u64, blinding_factor: Scalar) -> CompressedNodeContent<D> {
+    // STENT TODO why have value as u64 and blinding factor as scalar? As apposed to both Scalar
+    pub fn new(value: u64, blinding_factor: Scalar) -> CompressedNodeContent<H> {
         // compute the Pedersen commitment to the value
         let commitment = PedersenGens::default().commit(Scalar::from(value), blinding_factor);
 
         // compute the hash as the hashing of the commitment
         // STENT TODO this hash is not correct, it needs to contain the id and s values
         //   this will be the same as the full node so probably useful to have this functionality shared
-        let mut hasher = D::new();
+        let mut hasher = H::new();
         hasher.update("leaf".as_bytes());
         hasher.update(&(commitment.compress().as_bytes()));
         let hash = hasher.finalize_as_h256();
