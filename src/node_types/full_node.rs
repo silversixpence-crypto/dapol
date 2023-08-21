@@ -39,18 +39,20 @@ impl<H: Digest + H256Convertable> FullNodeContent<H> {
     /// The `blinding_factor` needs to have a larger sized storage space (256 bits) ensure promised
     /// n-bit security of the commitments; it can be enlarged to 512 bits if need be as this size
     /// is supported by the underlying `Scalar` constructors.
-    pub fn new(value: u64, blinding_factor: [u8; 32]) -> FullNodeContent<H> {
+    pub fn new_leaf(value: u64, blinding_factor: [u8; 32], user_id: [u8; 32], user_salt: [u8; 32]) -> FullNodeContent<H> {
         use bulletproofs::PedersenGens;
 
         let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor);
 
-        // compute the Pedersen commitment to the value
-        let commitment = PedersenGens::default().commit(Scalar::from(value), blinding_factor_scalar.clone());
+        // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
+        let commitment = PedersenGens::default().commit(Scalar::from(value), Scalar::from_bytes_mod_order(blinding_factor));
 
-        // compute the hash as the hashing of the commitment
+        // Compute the hash: `H("leaf" | user_id | user_salt)`
         let mut hasher = H::new();
-        hasher.update(&(commitment.compress().as_bytes()));
-        let hash = hasher.finalize_as_h256(); // STENT TODO double check the output of this thing
+        hasher.update("leaf".as_bytes());
+        hasher.update(user_id);
+        hasher.update(user_salt);
+        let hash = hasher.finalize_as_h256();
 
         FullNodeContent {
             liability: value,

@@ -31,18 +31,17 @@ impl<H: Digest + H256Convertable> CompressedNodeContent<H> {
     /// The `blinding_factor` needs to have a larger sized storage space (256 bits) ensure promised
     /// n-bit security of the commitments; it can be enlarged to 512 bits if need be as this size
     /// is supported by the underlying `Scalar` constructors.
-    pub fn new(value: u64, blinding_factor: [u8; 32]) -> CompressedNodeContent<H> {
+    pub fn new_leaf(value: u64, blinding_factor: [u8; 32], user_id: [u8; 32], user_salt: [u8; 32]) -> CompressedNodeContent<H> {
         use bulletproofs::PedersenGens;
 
-        // compute the Pedersen commitment to the value
+        // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
         let commitment = PedersenGens::default().commit(Scalar::from(value), Scalar::from_bytes_mod_order(blinding_factor));
 
-        // compute the hash as the hashing of the commitment
-        // STENT TODO this hash is not correct, it needs to contain the id and s values
-        //   this will be the same as the full node so probably useful to have this functionality shared
+        // Compute the hash: `H("leaf" | user_id | user_salt)`
         let mut hasher = H::new();
         hasher.update("leaf".as_bytes());
-        hasher.update(&(commitment.compress().as_bytes()));
+        hasher.update(user_id);
+        hasher.update(user_salt);
         let hash = hasher.finalize_as_h256();
 
         CompressedNodeContent {
@@ -50,13 +49,6 @@ impl<H: Digest + H256Convertable> CompressedNodeContent<H> {
             hash,
             _phantom_hash_function: PhantomData,
         }
-    }
-}
-
-// STENT TODO why not just have this be derived? Would the phantom data be an issue?
-impl<H> PartialEq for CompressedNodeContent<H> {
-    fn eq(&self, other: &Self) -> bool {
-        self.commitment == other.commitment && self.hash == other.hash
     }
 }
 
@@ -73,10 +65,10 @@ impl H256Convertable for blake3::Hasher {
 
 impl<H: Digest + H256Convertable> Mergeable for CompressedNodeContent<H> {
     fn merge(left_sibling: &Self, right_sibling: &Self) -> Self {
-        // C(parent) = C(L) + C(R)
+        // `C(parent) = C(L) + C(R)`
         let parent_commitment = left_sibling.commitment + right_sibling.commitment;
 
-        // H(parent) = Hash(C(L) | C(R) | H(L) | H(R))
+        // `H(parent) = Hash(C(L) | C(R) | H(L) | H(R))`
         let parent_hash = {
             let mut hasher = H::new();
             hasher.update(left_sibling.commitment.compress().as_bytes());
