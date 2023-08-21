@@ -13,6 +13,7 @@ use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use digest::Digest;
 use primitive_types::H256;
 use std::marker::PhantomData;
+use num256::Uint256;
 
 use super::compressed_node::H256Convertable;
 
@@ -41,6 +42,7 @@ impl<H: Digest + H256Convertable> FullNodeContent<H> {
     /// is supported by the underlying `Scalar` constructors.
     pub fn new_leaf(
         value: u64,
+        // STENT TODO should we have raw byte arrays like this? Or rather have distinct data types?
         blinding_factor: [u8; 32],
         user_id: [u8; 32],
         user_salt: [u8; 32],
@@ -60,6 +62,38 @@ impl<H: Digest + H256Convertable> FullNodeContent<H> {
         hasher.update("leaf".as_bytes());
         hasher.update(user_id);
         hasher.update(user_salt);
+        let hash = hasher.finalize_as_h256();
+
+        FullNodeContent {
+            liability: value,
+            blinding_factor: blinding_factor_scalar,
+            commitment,
+            hash,
+            _phantom_hash_function: PhantomData,
+        }
+    }
+
+    pub fn new_pad(
+        value: u64,
+        blinding_factor: [u8; 32],
+        coord: [u8; 32],
+        salt: [u8; 32],
+    ) -> FullNodeContent<H> {
+        use bulletproofs::PedersenGens;
+
+        let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor);
+
+        // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
+        let commitment = PedersenGens::default().commit(
+            Scalar::from(value),
+            Scalar::from_bytes_mod_order(blinding_factor),
+        );
+
+        // Compute the hash: `H("pad" | coordinate | salt)`
+        let mut hasher = H::new();
+        hasher.update("pad".as_bytes());
+        hasher.update(coord);
+        hasher.update(salt);
         let hash = hasher.finalize_as_h256();
 
         FullNodeContent {
