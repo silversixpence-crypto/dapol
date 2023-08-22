@@ -11,6 +11,7 @@ use std::marker::PhantomData;
 use crate::binary_tree::{Coordinate, Mergeable};
 use crate::primitives::D256;
 use crate::user::UserId;
+use crate::primitives::H256Finalizable;
 
 /// Main struct containing the Pedersen commitment & hash.
 ///
@@ -25,7 +26,7 @@ pub struct CompressedNodeContent<H> {
     _phantom_hash_function: PhantomData<H>,
 }
 
-impl<H: Digest + H256Convertable> CompressedNodeContent<H> {
+impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
     /// Constructor.
     ///
     /// The secret `value` realistically does not need more space than 64 bits because it is
@@ -97,20 +98,12 @@ impl<H: Digest + H256Convertable> CompressedNodeContent<H> {
     }
 }
 
-// STENT TODO is this the best method for doing this?
-pub trait H256Convertable {
-    fn finalize_as_h256(&self) -> H256;
-}
-
-impl H256Convertable for blake3::Hasher {
-    fn finalize_as_h256(&self) -> H256 {
-        H256(self.finalize().as_bytes().clone())
-    }
-}
-
-impl<H: Digest + H256Convertable> Mergeable for CompressedNodeContent<H> {
+impl<H: Digest + H256Finalizable> Mergeable for CompressedNodeContent<H> {
+    /// Returns the parent node content by merging two child node contents.
+    ///
+    /// The commitment of the parent is the homomorphic sum of the two children.
+    /// The hash of the parent is computed by hashing the concatenated commitments and hashes of two children.
     fn merge(left_sibling: &Self, right_sibling: &Self) -> Self {
-        // `C(parent) = C(L) + C(R)`
         let parent_commitment = left_sibling.commitment + right_sibling.commitment;
 
         // `H(parent) = Hash(C(L) | C(R) | H(L) | H(R))`
@@ -120,7 +113,7 @@ impl<H: Digest + H256Convertable> Mergeable for CompressedNodeContent<H> {
             hasher.update(right_sibling.commitment.compress().as_bytes());
             hasher.update(left_sibling.hash.as_bytes());
             hasher.update(right_sibling.hash.as_bytes());
-            hasher.finalize_as_h256() // STENT TODO double check the output of this thing
+            hasher.finalize_as_h256() // TODO do a unit test that compares the output of this to a different piece of code
         };
 
         CompressedNodeContent {
@@ -131,6 +124,7 @@ impl<H: Digest + H256Convertable> Mergeable for CompressedNodeContent<H> {
     }
 }
 
+// TODO should fuzz the values instead of hard-coding
 #[cfg(test)]
 mod tests {
     use super::*;

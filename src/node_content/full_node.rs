@@ -1,4 +1,4 @@
-//! An implementation of the content generic type required for [crate][binary_tree][`Node<C>`].
+//! An implementation of the generic content type required for [crate][binary_tree][`Node<C>`].
 //!
 //! This implementation contains the values in the [super][compressed_node] implementation
 //! (Pedersen commitment & hash) plus the additional private values (blinding factor and plain text
@@ -10,32 +10,37 @@
 //! All the logic related to how to construct the content of a node is held in this file.
 
 use crate::binary_tree::{Coordinate, Mergeable};
-use crate::user::UserId;
 use crate::primitives::D256;
+use crate::user::UserId;
 
+use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use digest::Digest;
 use primitive_types::H256;
 use std::marker::PhantomData;
-use bulletproofs::PedersenGens;
 
-use super::compressed_node::H256Convertable;
+use crate::primitives::H256Finalizable;
 
-// DAPOL NODE
-// ================================================================================================
-
-/// A node of the DAPOL tree, consisting of the liability, the blinding factor,
-/// the Pedersen commitment and the hash.
+/// Main struct containing:
+/// - Raw liability value
+/// - Blinding factor
+/// - Pedersen commitment
+/// - Hash
+///
+/// The hash function needs to be a generic parameter because when implementing
+/// [crate][binary_tree][`Mergeable`] one needs to define the merge function, is not generic
+/// and the merge function in this case needs to use a generic hash function. One way to
+/// solve this is to have a generic parameter on this struct and a phantom field.
 #[derive(Default, Clone, Debug)]
 pub struct FullNodeContent<H> {
     liability: u64,
     blinding_factor: Scalar,
     commitment: RistrettoPoint,
     hash: H256,
-    _phantom_hash_function: PhantomData<H>, // STENT TODO is this needed?
+    _phantom_hash_function: PhantomData<H>,
 }
 
-impl<H: Digest + H256Convertable> FullNodeContent<H> {
+impl<H: Digest + H256Finalizable> FullNodeContent<H> {
     /// Constructor.
     ///
     /// The secret `liability` realistically does not need more space than 64 bits because it is
@@ -80,19 +85,13 @@ impl<H: Digest + H256Convertable> FullNodeContent<H> {
     ///
     /// The hash requires the node's coordinate as well as a salt. Since the liability of a
     /// padding node is 0 only the blinding factor is required for the Pedersen commitment.
-    pub fn new_pad(
-        blinding_factor: D256,
-        coord: &Coordinate,
-        salt: D256,
-    ) -> FullNodeContent<H> {
+    pub fn new_pad(blinding_factor: D256, coord: &Coordinate, salt: D256) -> FullNodeContent<H> {
         let liability = 0u64;
         let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor.into());
 
         // Compute the Pedersen commitment to the liability `P = g_1^liability * g_2^blinding_factor`
-        let commitment = PedersenGens::default().commit(
-            Scalar::from(liability),
-            blinding_factor_scalar,
-        );
+        let commitment =
+            PedersenGens::default().commit(Scalar::from(liability), blinding_factor_scalar);
 
         let coord_bytes = coord.as_bytes();
         let salt_bytes: [u8; 32] = salt.into();
@@ -112,37 +111,34 @@ impl<H: Digest + H256Convertable> FullNodeContent<H> {
             _phantom_hash_function: PhantomData,
         }
     }
-
-    /// Returns the liability of this node.
-    pub fn get_liability(&self) -> u64 {
-        self.liability
-    }
-
-    /// Returns the blinding factor of this node.
-    pub fn get_blinding_factor(&self) -> Scalar {
-        self.blinding_factor
-    }
 }
 
-impl<H: Digest + H256Convertable> Mergeable for FullNodeContent<H> {
-    /// Returns the parent node content by merging two child nodes.
+impl<H: Digest + H256Finalizable> Mergeable for FullNodeContent<H> {
+    /// Returns the parent node content by merging two child node contents.
     ///
     /// The value and blinding factor of the parent are the sums of the two children respectively.
     /// The commitment of the parent is the homomorphic sum of the two children.
     /// The hash of the parent is computed by hashing the concatenated commitments and hashes of two children.
-    fn merge(lch: &FullNodeContent<H>, rch: &FullNodeContent<H>) -> FullNodeContent<H> {
-        // H(parent) = Hash(C(L) || C(R) || H(L) || H(R))
-        let mut hasher = H::new();
-        hasher.update(lch.commitment.compress().as_bytes());
-        hasher.update(rch.commitment.compress().as_bytes());
-        hasher.update(&lch.hash);
-        hasher.update(&rch.hash);
+    fn merge(left_sibling: &Self, right_sibling: &Self) -> Self {
+        let parent_liability = left_sibling.liability + right_sibling.liability;
+        let parent_blinding_factor = left_sibling.blinding_factor + right_sibling.blinding_factor;
+        let parent_commitment = left_sibling.commitment + right_sibling.commitment;
+
+        // `H(parent) = Hash(C(L) | C(R) | H(L) | H(R))`
+        let parent_hash = {
+            let mut hasher = H::new();
+            hasher.update(left_sibling.commitment.compress().as_bytes());
+            hasher.update(right_sibling.commitment.compress().as_bytes());
+            hasher.update(left_sibling.hash.as_bytes());
+            hasher.update(right_sibling.hash.as_bytes());
+            hasher.finalize_as_h256() // TODO do a unit test that compares the output of this to a different piece of code
+        };
 
         FullNodeContent {
-            liability: lch.liability + rch.liability,
-            blinding_factor: lch.blinding_factor + rch.blinding_factor,
-            commitment: lch.commitment + rch.commitment,
-            hash: hasher.finalize_as_h256(),
+            liability: parent_liability,
+            blinding_factor: parent_blinding_factor,
+            commitment: left_sibling.commitment + right_sibling.commitment,
+            hash: parent_hash,
             _phantom_hash_function: PhantomData,
         }
     }
@@ -151,8 +147,8 @@ impl<H: Digest + H256Convertable> Mergeable for FullNodeContent<H> {
 // TODO should fuzz the values instead of hard-coding
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn new_leaf_works() {
