@@ -1,26 +1,29 @@
 //! An implementation of the content generic type required for [crate][binary_tree][`Node<C>`].
 //!
-//! This implementation contains the values in the [super][TODO link to compressed] implementation
+//! This implementation contains the values in the [super][compressed_node] implementation
 //! (Pedersen commitment & hash) plus the additional private values (blinding factor and plain text
 //! liability). The private values are included so that the total blinding factor & liability sum
 //! can be accessed after tree construction. This node type should ideally not be used in
 //! the serialization process since it will increase the final byte size and expose the secret
 //! values.
+//!
+//! All the logic related to how to construct the content of a node is held in this file.
 
-use crate::binary_tree::Mergeable;
+use crate::binary_tree::{Coordinate, Mergeable};
+use super::{UserId, D256};
 
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use digest::Digest;
 use primitive_types::H256;
 use std::marker::PhantomData;
-use num256::Uint256;
+use bulletproofs::PedersenGens;
 
 use super::compressed_node::H256Convertable;
 
 // DAPOL NODE
 // ================================================================================================
 
-/// A node of the DAPOL tree, consisting of the value, the blinding factor,
+/// A node of the DAPOL tree, consisting of the liability, the blinding factor,
 /// the Pedersen commitment and the hash.
 #[derive(Default, Clone, Debug)]
 pub struct FullNodeContent<H> {
@@ -34,38 +37,37 @@ pub struct FullNodeContent<H> {
 impl<H: Digest + H256Convertable> FullNodeContent<H> {
     /// Constructor.
     ///
-    /// The secret `value` realistically does not need more space than 64 bits because it is
+    /// The secret `liability` realistically does not need more space than 64 bits because it is
     /// generally used for monetary value or head count, also the Bulletproofs library requires
     /// the value to be u64.
     /// The `blinding_factor` needs to have a larger sized storage space (256 bits) ensure promised
     /// n-bit security of the commitments; it can be enlarged to 512 bits if need be as this size
     /// is supported by the underlying `Scalar` constructors.
     pub fn new_leaf(
-        value: u64,
-        // STENT TODO should we have raw byte arrays like this? Or rather have distinct data types?
-        blinding_factor: [u8; 32],
-        user_id: [u8; 32],
-        user_salt: [u8; 32],
+        liability: u64,
+        blinding_factor: D256,
+        user_id: UserId,
+        user_salt: D256,
     ) -> FullNodeContent<H> {
-        use bulletproofs::PedersenGens;
+        // Scalar expects bytes to be in little-endian
+        let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor.into());
 
-        let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor);
+        // Compute the Pedersen commitment to the liability `P = g_1^liability * g_2^blinding_factor`
+        let commitment =
+            PedersenGens::default().commit(Scalar::from(liability), blinding_factor_scalar);
 
-        // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
-        let commitment = PedersenGens::default().commit(
-            Scalar::from(value),
-            Scalar::from_bytes_mod_order(blinding_factor),
-        );
+        let user_id_bytes: [u8; 32] = user_id.into();
+        let user_salt_bytes: [u8; 32] = user_salt.into();
 
         // Compute the hash: `H("leaf" | user_id | user_salt)`
         let mut hasher = H::new();
         hasher.update("leaf".as_bytes());
-        hasher.update(user_id);
-        hasher.update(user_salt);
+        hasher.update(user_id_bytes);
+        hasher.update(user_salt_bytes);
         let hash = hasher.finalize_as_h256();
 
         FullNodeContent {
-            liability: value,
+            liability,
             blinding_factor: blinding_factor_scalar,
             commitment,
             hash,
@@ -73,31 +75,36 @@ impl<H: Digest + H256Convertable> FullNodeContent<H> {
         }
     }
 
+    /// Create the content for a new padding node.
+    ///
+    /// The hash requires the node's coordinate as well as a salt. Since the liability of a
+    /// padding node is 0 only the blinding factor is required for the Pedersen commitment.
     pub fn new_pad(
-        value: u64,
-        blinding_factor: [u8; 32],
-        coord: [u8; 32],
-        salt: [u8; 32],
+        blinding_factor: D256,
+        coord: &Coordinate,
+        salt: D256,
     ) -> FullNodeContent<H> {
-        use bulletproofs::PedersenGens;
+        let liability = 0u64;
+        let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor.into());
 
-        let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor);
-
-        // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
+        // Compute the Pedersen commitment to the liability `P = g_1^liability * g_2^blinding_factor`
         let commitment = PedersenGens::default().commit(
-            Scalar::from(value),
-            Scalar::from_bytes_mod_order(blinding_factor),
+            Scalar::from(liability),
+            blinding_factor_scalar,
         );
+
+        let coord_bytes = coord.as_bytes();
+        let salt_bytes: [u8; 32] = salt.into();
 
         // Compute the hash: `H("pad" | coordinate | salt)`
         let mut hasher = H::new();
         hasher.update("pad".as_bytes());
-        hasher.update(coord);
-        hasher.update(salt);
+        hasher.update(coord_bytes);
+        hasher.update(salt_bytes);
         let hash = hasher.finalize_as_h256();
 
         FullNodeContent {
-            liability: value,
+            liability,
             blinding_factor: blinding_factor_scalar,
             commitment,
             hash,
@@ -143,43 +150,34 @@ impl<H: Digest + H256Convertable> Mergeable for FullNodeContent<H> {
 // TODO should fuzz the values instead of hard-coding
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
     use super::*;
 
-    fn extend_to_u8_32<const A: usize, const B: usize>(arr: [u8; A]) -> [u8; B] {
-        assert!(B >= A); //just for a nicer error message, adding #[track_caller] to the function may also be desirable
-        let mut b = [0; B];
-        b[..A].copy_from_slice(&arr);
-        b
-    }
+    #[test]
+    fn new_leaf_works() {
+        let liability = 11u64;
+        let blinding_factor = 7u64.into();
+        let user_id = UserId::from_str("some user").unwrap();
+        let user_salt = 13u64.into();
 
-    // https://stackoverflow.com/questions/71642583/rust-convert-str-to-fixedslices-array-of-u8
-    fn to_u8_32(str: &str) -> [u8; 32] {
-        let mut arr = [0u8; 32];
-        arr[..str.len()].copy_from_slice(str.as_bytes());
-        arr
+        FullNodeContent::<blake3::Hasher>::new_leaf(liability, blinding_factor, user_id, user_salt);
     }
 
     #[test]
-    fn constructor_works() {
-        let liability = 11u64;
-        let blinding_factor = extend_to_u8_32(7u64.to_le_bytes());
-        let user_id = to_u8_32("some user");
-        let user_salt = to_u8_32("some salt");
+    fn new_pad_works() {
+        let blinding_factor = 7u64.into();
+        let coord = Coordinate::new(1u64, 2u8);
+        let user_salt = 13u64.into();
 
-        FullNodeContent::<blake3::Hasher>::new_leaf(
-            liability,
-            blinding_factor,
-            user_id,
-            user_salt,
-        );
+        FullNodeContent::<blake3::Hasher>::new_pad(blinding_factor, &coord, user_salt);
     }
 
     #[test]
     fn merge_works() {
         let liability_1 = 11u64;
-        let blinding_factor_1 = extend_to_u8_32(7u64.to_le_bytes());
-        let user_id_1 = to_u8_32("some user 1");
-        let user_salt_1 = to_u8_32("some salt 1");
+        let blinding_factor_1 = 7u64.into();
+        let user_id_1 = UserId::from_str("some user 1").unwrap();
+        let user_salt_1 = 13u64.into();
         let node_1 = FullNodeContent::<blake3::Hasher>::new_leaf(
             liability_1,
             blinding_factor_1,
@@ -187,10 +185,10 @@ mod tests {
             user_salt_1,
         );
 
-        let liability_2 = 11u64;
-        let blinding_factor_2 = extend_to_u8_32(7u64.to_le_bytes());
-        let user_id_2 = to_u8_32("some user 1");
-        let user_salt_2 = to_u8_32("some salt 1");
+        let liability_2 = 21u64;
+        let blinding_factor_2 = 27u64.into();
+        let user_id_2 = UserId::from_str("some user 2").unwrap();
+        let user_salt_2 = 23u64.into();
         let node_2 = FullNodeContent::<blake3::Hasher>::new_leaf(
             liability_2,
             blinding_factor_2,

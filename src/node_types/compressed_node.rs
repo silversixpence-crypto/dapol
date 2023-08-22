@@ -2,12 +2,15 @@
 //!
 //! This implementation contains only the Pedersen commitment and the hash as fields in the struct.
 
+use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use digest::Digest;
 use primitive_types::H256;
 use std::marker::PhantomData;
 
-use crate::binary_tree::Mergeable;
+use crate::binary_tree::{Mergeable, Coordinate};
+
+use super::{UserId, D256};
 
 /// Main struct containing the Pedersen commitment & hash.
 ///
@@ -32,24 +35,58 @@ impl<H: Digest + H256Convertable> CompressedNodeContent<H> {
     /// n-bit security of the commitments; it can be enlarged to 512 bits if need be as this size
     /// is supported by the underlying `Scalar` constructors.
     pub fn new_leaf(
-        value: u64,
-        blinding_factor: [u8; 32],
-        user_id: [u8; 32],
-        user_salt: [u8; 32],
+        liability: u64,
+        blinding_factor: D256,
+        user_id: UserId,
+        user_salt: D256,
     ) -> CompressedNodeContent<H> {
         use bulletproofs::PedersenGens;
 
         // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
         let commitment = PedersenGens::default().commit(
-            Scalar::from(value),
-            Scalar::from_bytes_mod_order(blinding_factor),
+            Scalar::from(liability),
+            Scalar::from_bytes_mod_order(blinding_factor.into()),
         );
+
+        let user_id_bytes: [u8; 32] = user_id.into();
+        let user_salt_bytes: [u8; 32] = user_salt.into();
 
         // Compute the hash: `H("leaf" | user_id | user_salt)`
         let mut hasher = H::new();
         hasher.update("leaf".as_bytes());
-        hasher.update(user_id);
-        hasher.update(user_salt);
+        hasher.update(user_id_bytes);
+        hasher.update(user_salt_bytes);
+        let hash = hasher.finalize_as_h256();
+
+        CompressedNodeContent {
+            commitment,
+            hash,
+            _phantom_hash_function: PhantomData,
+        }
+    }
+
+    /// Create the content for a new padding node.
+    ///
+    /// The hash requires the node's coordinate as well as a salt. Since the liability of a
+    /// padding node is 0 only the blinding factor is required for the Pedersen commitment.
+    pub fn new_pad(
+        blinding_factor: D256,
+        coord: &Coordinate,
+        salt: D256,
+    ) -> CompressedNodeContent<H> {
+        // Compute the Pedersen commitment to 0 `P = g_1^0 * g_2^blinding_factor`
+        let commitment = PedersenGens::default().commit(
+            Scalar::from(0u64),
+            Scalar::from_bytes_mod_order(blinding_factor.into()),
+        );
+
+        let salt_bytes: [u8; 32] = salt.into();
+
+        // Compute the hash: `H("pad" | coordinate | salt)`
+        let mut hasher = H::new();
+        hasher.update("pad".as_bytes());
+        hasher.update(coord.as_bytes());
+        hasher.update(salt_bytes);
         let hash = hasher.finalize_as_h256();
 
         CompressedNodeContent {
@@ -96,31 +133,15 @@ impl<H: Digest + H256Convertable> Mergeable for CompressedNodeContent<H> {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryInto;
-
+    use std::str::FromStr;
     use super::*;
-
-    /// This is only for little endian bytes, which `Scalar` uses.
-    fn extend_to_u8_32<const A: usize, const B: usize>(arr: [u8; A]) -> [u8; B] {
-        assert!(B >= A); //just for a nicer error message, adding #[track_caller] to the function may also be desirable
-        let mut b = [0; B];
-        b[..A].copy_from_slice(&arr);
-        b
-    }
-
-    // https://stackoverflow.com/questions/71642583/rust-convert-str-to-fixedslices-array-of-u8
-    fn str_to_u8_32(str: &str) -> [u8; 32] {
-        let mut arr = [0u8; 32];
-        arr[..str.len()].copy_from_slice(str.as_bytes());
-        arr
-    }
 
     #[test]
     fn constructor_works() {
         let liability = 11u64;
-        let blinding_factor = extend_to_u8_32(7u64.to_le_bytes());
-        let user_id = str_to_u8_32("some user");
-        let user_salt = str_to_u8_32("some salt");
+        let blinding_factor = 7u64.into();
+        let user_id = UserId::from_str("some user").unwrap();
+        let user_salt = 13u64.into();
 
         CompressedNodeContent::<blake3::Hasher>::new_leaf(
             liability,
@@ -131,11 +152,20 @@ mod tests {
     }
 
     #[test]
+    fn new_pad_works() {
+        let blinding_factor = 7u64.into();
+        let coord = Coordinate::new(1u64, 2u8);
+        let user_salt = 13u64.into();
+
+        CompressedNodeContent::<blake3::Hasher>::new_pad(blinding_factor, &coord, user_salt);
+    }
+
+    #[test]
     fn merge_works() {
         let liability_1 = 11u64;
-        let blinding_factor_1 = extend_to_u8_32(7u64.to_le_bytes());
-        let user_id_1 = str_to_u8_32("some user 1");
-        let user_salt_1 = str_to_u8_32("some salt 1");
+        let blinding_factor_1 = 7u64.into();
+        let user_id_1 = UserId::from_str("some user 1").unwrap();
+        let user_salt_1 = 13u64.into();
         let node_1 = CompressedNodeContent::<blake3::Hasher>::new_leaf(
             liability_1,
             blinding_factor_1,
@@ -143,10 +173,10 @@ mod tests {
             user_salt_1,
         );
 
-        let liability_2 = 11u64;
-        let blinding_factor_2 = extend_to_u8_32(7u64.to_le_bytes());
-        let user_id_2 = str_to_u8_32("some user 1");
-        let user_salt_2 = str_to_u8_32("some salt 1");
+        let liability_2 = 21u64;
+        let blinding_factor_2 = 27u64.into();
+        let user_id_2 = UserId::from_str("some user 2").unwrap();
+        let user_salt_2 = 23u64.into();
         let node_2 = CompressedNodeContent::<blake3::Hasher>::new_leaf(
             liability_2,
             blinding_factor_2,
