@@ -8,9 +8,9 @@ use digest::Digest;
 use primitive_types::H256;
 use std::marker::PhantomData;
 
-use crate::binary_tree::{Mergeable, Coordinate};
-
-use super::{UserId, D256};
+use crate::binary_tree::{Coordinate, Mergeable};
+use crate::primitives::D256;
+use crate::user::UserId;
 
 /// Main struct containing the Pedersen commitment & hash.
 ///
@@ -133,8 +133,8 @@ impl<H: Digest + H256Convertable> Mergeable for CompressedNodeContent<H> {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn constructor_works() {

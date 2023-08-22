@@ -10,7 +10,8 @@
 //! All the logic related to how to construct the content of a node is held in this file.
 
 use crate::binary_tree::{Coordinate, Mergeable};
-use super::{UserId, D256};
+use crate::user::UserId;
+use crate::primitives::D256;
 
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use digest::Digest;
