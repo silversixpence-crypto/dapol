@@ -40,7 +40,7 @@ fn build_dapol(c: &mut Criterion) {
         });
     }
 
-    let num_leaves_other: [usize; 1] = [2usize.pow(30)];
+    let num_leaves_other: [usize; 1] = [2usize.pow(24)];
 
     // bench tree height = 32
     let tree_height = 32;
@@ -77,7 +77,7 @@ fn generate_proof(c: &mut Criterion) {
 
     // this benchmark depends on the tree height and not the number of leaves,
     // so we just pick the smallest number of leaves
-    let num_leaves = 2usize.pow(30); // NUM_LEAVES[0];
+    let num_leaves = 2usize.pow(24); // NUM_LEAVES[0];
     for &tree_height in TREE_HEIGHTS.iter() {
         let items = build_item_list(num_leaves, tree_height);
         let mut rng = thread_rng();
@@ -111,7 +111,7 @@ fn verify_proof(c: &mut Criterion) {
 
     // this benchmark depends on the tree height and not the number of leaves,
     // so we just pick the smallest number of leaves
-    let num_leaves = 2usize.pow(30); // NUM_LEAVES[0];
+    let num_leaves = 2usize.pow(24); // NUM_LEAVES[0];
     for &tree_height in TREE_HEIGHTS.iter() {
         let items = build_item_list(num_leaves, tree_height);
         let mut rng = thread_rng();
