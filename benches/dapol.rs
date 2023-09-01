@@ -40,11 +40,26 @@ fn build_dapol(c: &mut Criterion) {
         });
     }
 
+    let num_leaves_other: [usize; 1] = [2usize.pow(30)];
+
     // bench tree height = 32
     let tree_height = 32;
-    for &num_leaves in NUM_LEAVES.iter() {
+    for &num_leaves in num_leaves_other.iter() {
         let items = build_item_list(num_leaves, tree_height);
         group.bench_function(BenchmarkId::new("height_32", num_leaves), |bench| {
+            bench.iter(|| {
+                // we bench range proof padding only because building a tree does not depend on
+                // the type of range proof we do
+                build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items, tree_height)
+            });
+        });
+    }
+
+    // bench tree height = 64
+    let tree_height = 64;
+    for &num_leaves in num_leaves_other.iter() {
+        let items = build_item_list(num_leaves, tree_height);
+        group.bench_function(BenchmarkId::new("height_64", num_leaves), |bench| {
             bench.iter(|| {
                 // we bench range proof padding only because building a tree does not depend on
                 // the type of range proof we do
@@ -62,7 +77,7 @@ fn generate_proof(c: &mut Criterion) {
 
     // this benchmark depends on the tree height and not the number of leaves,
     // so we just pick the smallest number of leaves
-    let num_leaves = NUM_LEAVES[0];
+    let num_leaves = 2usize.pow(30); // NUM_LEAVES[0];
     for &tree_height in TREE_HEIGHTS.iter() {
         let items = build_item_list(num_leaves, tree_height);
         let mut rng = thread_rng();
@@ -96,7 +111,7 @@ fn verify_proof(c: &mut Criterion) {
 
     // this benchmark depends on the tree height and not the number of leaves,
     // so we just pick the smallest number of leaves
-    let num_leaves = NUM_LEAVES[0];
+    let num_leaves = 2usize.pow(30); // NUM_LEAVES[0];
     for &tree_height in TREE_HEIGHTS.iter() {
         let items = build_item_list(num_leaves, tree_height);
         let mut rng = thread_rng();
