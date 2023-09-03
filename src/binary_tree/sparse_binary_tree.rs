@@ -126,35 +126,40 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
             nodes = nodes
                 .into_iter()
                 // sort nodes into pairs (left & right siblings)
-                .fold(Vec::<MaybeUnmatchedPair<C>>::with_capacity(num_nodes_next_layer), |mut pairs, node| {
-                    let sibling = Sibling::from_node(node);
-                    match sibling {
-                        Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
-                            left: Some(left_sibling),
-                            right: Option::None,
-                        }),
-                        Sibling::Right(right_sibling) => {
-                            let is_right_sibling_of_prev_node = pairs
-                                .last_mut()
-                                .map(|pair| (&pair.left).as_ref())
-                                .flatten()
-                                .is_some_and(|left| right_sibling.0.is_right_sibling_of(&left.0));
-                            if is_right_sibling_of_prev_node {
-                                pairs
+                .fold(
+                    Vec::<MaybeUnmatchedPair<C>>::with_capacity(num_nodes_next_layer),
+                    |mut pairs, node| {
+                        let sibling = Sibling::from_node(node);
+                        match sibling {
+                            Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
+                                left: Some(left_sibling),
+                                right: Option::None,
+                            }),
+                            Sibling::Right(right_sibling) => {
+                                let is_right_sibling_of_prev_node = pairs
                                     .last_mut()
-                                    // this case should never be reached because of the way is_right_sibling_of_prev_node is built
-                                    .expect("[Bug in tree constructor] Previous node not found")
-                                    .right = Option::Some(right_sibling);
-                            } else {
-                                pairs.push(MaybeUnmatchedPair {
-                                    left: Option::None,
-                                    right: Some(right_sibling),
-                                });
+                                    .map(|pair| (&pair.left).as_ref())
+                                    .flatten()
+                                    .is_some_and(|left| {
+                                        right_sibling.0.is_right_sibling_of(&left.0)
+                                    });
+                                if is_right_sibling_of_prev_node {
+                                    pairs
+                                        .last_mut()
+                                        // this case should never be reached because of the way is_right_sibling_of_prev_node is built
+                                        .expect("[Bug in tree constructor] Previous node not found")
+                                        .right = Option::Some(right_sibling);
+                                } else {
+                                    pairs.push(MaybeUnmatchedPair {
+                                        left: Option::None,
+                                        right: Some(right_sibling),
+                                    });
+                                }
                             }
                         }
-                    }
-                    pairs
-                })
+                        pairs
+                    },
+                )
                 .into_iter()
                 // add padding nodes to unmatched pairs
                 .map(|pair| match (pair.left, pair.right) {
@@ -257,6 +262,11 @@ impl<C: Clone> SparseBinaryTree<C> {
     /// Attempt to find a Node via it's coordinate in the underlying store.
     pub fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
         self.store.get(coord)
+    }
+    /// Attempt to find a bottom-layer leaf Node via it's x-coordinate in the underlying store.
+    pub fn get_leaf_node(&self, x_coord: u64) -> Option<&Node<C>> {
+        let coord = Coordinate { x: x_coord, y: 0 };
+        self.get_node(&coord)
     }
 }
 

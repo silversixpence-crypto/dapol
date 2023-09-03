@@ -5,11 +5,13 @@ use rand::{distributions::Uniform, thread_rng, Rng}; // TODO double check this i
 use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::binary_tree::{Coordinate, InputLeafNode, SparseBinaryTree, SparseBinaryTreeError};
+use crate::binary_tree::{Coordinate, InputLeafNode, SparseBinaryTree, SparseBinaryTreeError, PathError};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
 use crate::user::{User, UserId};
+use crate::inclusion_proof::InclusionProof;
+use crate::{RangeProofPadding, RangeVerifiable, RangeProvable};
 
 // -------------------------------------------------------------------------------------------------
 // NDM-SMT struct and methods
@@ -31,7 +33,7 @@ impl NdmSmt {
     /// Constructor.
     // TODO we should probably do a check to make sure the UserIDs are all unique, but not sure if this check should be here or in calling code
     #[allow(dead_code)]
-    fn new(
+    pub fn new(
         master_secret: D256,
         salt_b: D256,
         salt_s: D256,
@@ -91,6 +93,28 @@ impl NdmSmt {
             user_mapping,
         })
     }
+
+    // STENT TODO why have the proof generation logic here?
+    //   Because the range proof is specific to the node content, which is selected for in this file
+    pub fn generate_inclusion_proof(&self, user_id: &UserId) -> Result<InclusionProof<Content>, NdmSmtError> {
+        let leaf_x_coord = self.user_mapping.get(user_id).ok_or(NdmSmtError::UserIdNotFound)?;
+
+        let nodes = self.tree.get_path_nodes(*leaf_x_coord)?;
+
+        let secrets: Vec<u64> = nodes.0.iter().map(|node| {
+           node.get_content().get_liability()
+        }).collect();
+        let blindings: Vec<curve25519_dalek_ng::scalar::Scalar> = nodes.0.iter().map(|node| {
+            node.get_content().get_blinding_factor()
+        }).collect();
+        let aggregation_factor = 2usize; // STENT TODO make generic
+
+        let siblings = self.tree.get_siblings_for_path(*leaf_x_coord)?;
+        let range_proof = RangeProofPadding::generate_proof(&secrets, &blindings, aggregation_factor);
+
+        // STENT TODO the sibling nodes should be converted to the compressed node type, otherwise they give away information
+        Ok(InclusionProof::new(siblings, range_proof))
+    }
 }
 
 #[derive(Error, Debug)]
@@ -99,8 +123,11 @@ pub enum NdmSmtError {
     TreeError(#[from] SparseBinaryTreeError),
     #[error("Number of users cannot be bigger than 2^height")]
     HeightTooSmall(#[from] OutOfBoundsError),
+    #[error("Inclusion proof generation failed when trying to produce the siblings for the tree path")]
+    InclusionProofPathGenerationError(#[from] PathError),
+    #[error("User ID not found in the user mapping")]
+    UserIdNotFound,
 }
-
 
 // -------------------------------------------------------------------------------------------------
 // Random shuffle algorithm

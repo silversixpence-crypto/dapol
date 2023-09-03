@@ -21,6 +21,9 @@ use std::marker::PhantomData;
 
 use crate::primitives::H256Finalizable;
 
+// -------------------------------------------------------------------------------------------------
+// Struct, getters & constructors
+
 /// Main struct containing:
 /// - Raw liability value
 /// - Blinding factor
@@ -38,6 +41,30 @@ pub struct FullNodeContent<H> {
     commitment: RistrettoPoint,
     hash: H256,
     _phantom_hash_function: PhantomData<H>,
+}
+
+impl<H> PartialEq for FullNodeContent<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.liability == other.liability
+            && self.blinding_factor == other.blinding_factor
+            && self.commitment == other.commitment
+            && self.hash == other.hash
+    }
+}
+
+impl<H> FullNodeContent<H> {
+    pub fn get_liability(&self) -> u64 {
+        self.liability
+    }
+    pub fn get_blinding_factor(&self) -> Scalar {
+        self.blinding_factor
+    }
+    pub fn get_commitment(&self) -> RistrettoPoint {
+        self.commitment
+    }
+    pub fn get_hash(&self) -> H256 {
+        self.hash
+    }
 }
 
 impl<H: Digest + H256Finalizable> FullNodeContent<H> {
@@ -115,6 +142,9 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Implement Mergeable trait
+
 impl<H: Digest + H256Finalizable> Mergeable for FullNodeContent<H> {
     /// Returns the parent node content by merging two child node contents.
     ///
@@ -145,6 +175,9 @@ impl<H: Digest + H256Finalizable> Mergeable for FullNodeContent<H> {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Unit tests
 
 // TODO should fuzz the values instead of hard-coding
 #[cfg(test)]

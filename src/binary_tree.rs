@@ -6,6 +6,7 @@ use sparse_binary_tree::NodeOrientation;
 pub use sparse_binary_tree::{Coordinate, InputLeafNode, Mergeable, Node, SparseBinaryTree, SparseBinaryTreeError, num_bottom_layer_nodes};
 
 mod binary_tree_path;
+pub use binary_tree_path::{PathSiblings, PathError};
 
 // ===========================================
 // Helper functions that need to be made available to all submodules but kept private from calling code.
