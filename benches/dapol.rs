@@ -178,7 +178,7 @@ fn build_item_list(
 ) -> Vec<(TreeIndex, DapolNode<blake3::Hasher>)> {
     let mut result = Vec::new();
     let mut value = DapolNode::<blake3::Hasher>::default();
-    let stride = 2usize.pow(tree_height as u32) / num_leaves;
+    let stride = 2usize.pow(tree_height as u32 - 1) / num_leaves;
     for i in 0..num_leaves {
         let idx = TreeIndex::from_u64(tree_height, (i * stride) as u64);
         value.randomize();
