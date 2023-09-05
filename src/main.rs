@@ -23,7 +23,8 @@ fn new() {
     println!("new");
 
     let tree_height = 32;
-    let num_leaves: usize = 2usize.pow(20);
+    let num_leaves: usize = 2usize.pow(27); // 134M
+
     let items = build_item_list(num_leaves, tree_height);
     let users: Vec<User> = items
         .iter()
@@ -45,7 +46,7 @@ fn new() {
 
 fn old() {
     println!("old");
-    let num_leaves: usize = 2usize.pow(20);
+    let num_leaves: usize = 2usize.pow(27); // 134M
 
     // bench tree height = 32
     let tree_height = 32;
