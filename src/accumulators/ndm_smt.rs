@@ -57,8 +57,8 @@ impl NdmSmt {
         };
 
         let mut x_coord_generator = RandomXCoordGenerator::new(height);
-        let mut leaves = Vec::with_capacity(users.len());
-        let mut user_mapping = HashMap::with_capacity(users.len());
+        let mut leaves = Vec::new();
+        let mut user_mapping = HashMap::new();
         let mut i = 0;
 
         for user in users.into_iter() {

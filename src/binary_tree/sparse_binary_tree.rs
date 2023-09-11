@@ -69,6 +69,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
         let max_leaves = num_bottom_layer_nodes(height);
 
         // construct a sorted vector of leaf nodes and perform parameter correctness checks
+        println!("construct a sorted vector of leaf nodes and perform parameter correctness checks");
         let mut nodes = {
             if leaves.len() as u64 > max_leaves {
                 return Err(SparseBinaryTreeError::TooManyLeaves);
@@ -116,10 +117,12 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
         };
 
         // TODO flesh out the limitations around this conversion (since usize can be u32 on 32-bit systems, effectively truncation the u64)
-        let mut store = HashMap::with_capacity(max_leaves as usize);
+        let mut store = HashMap::new();
 
         // repeat for each layer of the tree
+        println!("entering for loop");
         for _i in 0..height - 1 {
+            println!("  i {:?}", _i);
             // TODO (same concern as above) flesh out the limitations around this conversion (since usize can be u32 on 32-bit systems, effectively truncation the u64)
             let num_nodes_next_layer = nodes.len() / 2 as usize;
             // create the next layer up of nodes from the current layer of nodes
@@ -127,8 +130,9 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
                 .into_iter()
                 // sort nodes into pairs (left & right siblings)
                 .fold(
-                    Vec::<MaybeUnmatchedPair<C>>::with_capacity(num_nodes_next_layer),
+                    Vec::<MaybeUnmatchedPair<C>>::new(),
                     |mut pairs, node| {
+                        println!("    inside fold");
                         let sibling = Sibling::from_node(node);
                         match sibling {
                             Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
@@ -179,6 +183,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
                 })
                 // create parents for the next loop iteration, and add the pairs to the tree store
                 .map(|pair| {
+                        println!("    inside 2nd map");
                     let parent = pair.merge();
                     store.insert(pair.left.0.coord.clone(), pair.left.0);
                     store.insert(pair.right.0.coord.clone(), pair.right.0);
@@ -186,6 +191,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
                 })
                 .collect();
         }
+        println!("done loop");
 
         // if the root node is not present then there is a bug in the above code
         let root = nodes
