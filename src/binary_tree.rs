@@ -453,4 +453,12 @@ mod tests {
             "Parent's x-coord should be half the child's"
         );
     }
+
+    #[test]
+    fn test_blake3_hashing() {
+        // https://asecuritysite.com/hash/blake3
+        // https://toolkitbay.com/tkb/tool/BLAKE3 
+        // 6b7fd4efda198a6b812a288cca023bbab947e6dc608b4a13e8922112f2f460de    
+        
+    }
 }
