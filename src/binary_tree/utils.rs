@@ -45,7 +45,7 @@ pub fn num_bottom_layer_nodes(height: u8) -> u64 {
 // -------------------------------------------------------------------------------------------------
 // Test utils for sub-modules.
 
-#[cfg(test)]
+
 pub mod test_utils {
     use super::super::*;
     use primitive_types::H256;

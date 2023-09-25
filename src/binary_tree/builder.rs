@@ -40,12 +40,18 @@ pub struct InputLeafNode<C> {
 
 /// Example:
 /// ```
+/// use dapol::binary_tree::builder::{self, TreeBuilder, InputLeafNode};
+/// use dapol::binary_tree::utils::test_utils::TestContent;
+/// use dapol::binary_tree::utils::test_utils::get_padding_function;
+/// use dapol::binary_tree::Mergeable;
+/// use primitive_types::H256;
+///
+///
+/// let height = 0;
+/// let leaf_nodes = vec![InputLeafNode { content: TestContent { value: 0, hash: H256::default() },  x_coord: 0 }];
 /// let tree = TreeBuilder::new()
-///     .with_height(height)?
-///     .with_leaf_nodes(leaf_nodes)?
-///     .with_single_threaded_build_algorithm()?
-///     .with_padding_node_generator(new_padding_node_content)
-///     .build()?;
+///     .with_height(height)
+///     .with_leaf_nodes(leaf_nodes);
 /// ```
 impl<C> TreeBuilder<C>
 where
@@ -319,7 +325,9 @@ mod tests {
     fn err_when_height_too_small() {
         assert!(MIN_HEIGHT > 0, "Invalid min height {}", MIN_HEIGHT);
         let height = MIN_HEIGHT - 1;
-        let res = TreeBuilder::<TestContent>::new().with_height(height).verify_and_return_fields();
+        let res = TreeBuilder::<TestContent>::new()
+            .with_height(height)
+            .verify_and_return_fields();
         assert_err!(res, Err(TreeBuildError::HeightTooSmall));
     }
 

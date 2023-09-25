@@ -27,12 +27,18 @@ where
 
 /// Example:
 /// ```
+/// use dapol::binary_tree::builder::{self, TreeBuilder, InputLeafNode};
+/// use dapol::binary_tree::utils::test_utils::TestContent;
+/// use dapol::binary_tree::utils::test_utils::get_padding_function;
+/// use dapol::binary_tree::Mergeable;
+/// use primitive_types::H256;
+///
+///
+/// let height = 0;
+/// let leaf_nodes = vec![InputLeafNode { content: TestContent { value: 0, hash: H256::default() },  x_coord: 0 }];
 /// let tree = TreeBuilder::new()
-///     .with_height(height)?
-///     .with_leaf_nodes(leaf_nodes)?
-///     .with_single_threaded_build_algorithm()?
-///     .with_padding_node_generator(new_padding_node_content)
-///     .build()?;
+///     .with_height(height)
+///     .with_leaf_nodes(leaf_nodes);
 /// ```
 impl<C, F> SingleThreadedBuilder<C, F>
 where
@@ -234,9 +240,9 @@ mod tests {
     use super::super::super::num_bottom_layer_nodes;
     use super::super::*;
     use crate::binary_tree::utils::test_utils::{
-        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent
+        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
     };
-    use crate::testing_utils::{assert_err_simple, assert_err};
+    use crate::testing_utils::{assert_err, assert_err_simple};
 
     use primitive_types::H256;
     use rand::{thread_rng, Rng};

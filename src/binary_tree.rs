@@ -34,13 +34,13 @@
 
 use std::collections::HashMap;
 
-mod builder;
+pub mod builder;
 pub use builder::{InputLeafNode, TreeBuildError, TreeBuilder};
 
 mod path;
 pub use path::{Path, PathError};
 
-mod utils;
+pub mod utils;
 pub use utils::num_bottom_layer_nodes;
 use utils::{ErrOnSome, ErrUnlessTrue};
 

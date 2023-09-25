@@ -17,9 +17,9 @@ mod tests;
 
 // new
 
-mod binary_tree;
-mod node_content;
+pub mod binary_tree;
 mod kdf;
+mod node_content;
 
 mod inclusion_proof;
 pub use inclusion_proof::{InclusionProof, InclusionProofError};

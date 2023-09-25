@@ -55,12 +55,18 @@ where
 
 /// Example:
 /// ```
+/// use dapol::binary_tree::builder::{self, TreeBuilder, InputLeafNode};
+/// use dapol::binary_tree::utils::test_utils::TestContent;
+/// use dapol::binary_tree::utils::test_utils::get_padding_function;
+/// use dapol::binary_tree::Mergeable;
+/// use primitive_types::H256;
+///
+///
+/// let height = 0;
+/// let leaf_nodes = vec![InputLeafNode { content: TestContent { value: 0, hash: H256::default() },  x_coord: 0 }];
 /// let tree = TreeBuilder::new()
-///     .with_height(height)?
-///     .with_leaf_nodes(leaf_nodes)?
-///     .with_single_threaded_build_algorithm()?
-///     .with_padding_node_generator(new_padding_node_content)
-///     .build()?;
+///     .with_height(height)
+///     .with_leaf_nodes(leaf_nodes);
 /// ```
 /// The type traits on `C` & `F` are required for thread spawning.
 impl<C, F> MultiThreadedBuilder<C, F>
