@@ -74,7 +74,7 @@ pub struct Coordinate {
 pub struct BinaryTree<C: Clone> {
     root: Node<C>,
     store: HashMap<Coordinate, Node<C>>,
-    pub height: u8,
+    height: u8,
 }
 
 // ===========================================
