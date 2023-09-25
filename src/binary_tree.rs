@@ -287,7 +287,9 @@ impl<C: Mergeable + Clone> BinaryTree<C> {
             nodes
         };
 
-        for _i in 0..height - 1 {
+        let mut i = 0;
+
+        while i < height - 1 {
             let iter = nodes.clone().into_iter().map(|node| node.to_pairs());
 
             let mut parents: Vec<Node<C>> = Vec::new();
@@ -308,6 +310,8 @@ impl<C: Mergeable + Clone> BinaryTree<C> {
             }
 
             nodes = parents;
+
+            i += 1;
         }
 
         // // repeat for each layer of the tree
