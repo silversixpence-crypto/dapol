@@ -240,52 +240,54 @@ impl<C: Mergeable + Clone> BinaryTree<C> {
     {
         let mut store = HashMap::new();
 
-        // construct a sorted vector of leaf nodes and perform parameter correctness checks
-        let mut nodes = {
-            let max_leaves = 2u64.pow(height as u32 - 1);
-            if leaves.len() as u64 > max_leaves {
-                return Err(BinaryTreeError::TooManyLeaves);
-            }
+        // // construct a sorted vector of leaf nodes and perform parameter correctness checks
+        // let mut nodes = {
+        //     let max_leaves = 2u64.pow(height as u32 - 1);
+        //     if leaves.len() as u64 > max_leaves {
+        //         return Err(BinaryTreeError::TooManyLeaves);
+        //     }
 
-            if leaves.len() < 1 {
-                return Err(BinaryTreeError::EmptyInput);
-            }
+        //     if leaves.len() < 1 {
+        //         return Err(BinaryTreeError::EmptyInput);
+        //     }
 
-            if height < MIN_HEIGHT {
-                return Err(BinaryTreeError::HeightTooSmall);
-            }
+        //     if height < MIN_HEIGHT {
+        //         return Err(BinaryTreeError::HeightTooSmall);
+        //     }
 
-            // translate InputLeafNode to Node
-            let mut nodes: Vec<Node<C>> = leaves.into_iter().map(|leaf| leaf.to_node()).collect();
+        //     // translate InputLeafNode to Node
+        //     let mut nodes: Vec<Node<C>> = leaves.into_iter().map(|leaf| leaf.to_node()).collect();
 
-            // sort by x_coord ascending
-            nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
+        //     // sort by x_coord ascending
+        //     nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
 
-            // make sure all x_coord < max
-            if nodes.last().is_some_and(|node| node.coord.x >= max_leaves) {
-                return Err(BinaryTreeError::InvalidXCoord);
-            }
+        //     // make sure all x_coord < max
+        //     if nodes.last().is_some_and(|node| node.coord.x >= max_leaves) {
+        //         return Err(BinaryTreeError::InvalidXCoord);
+        //     }
 
-            // ensure no duplicates
-            let duplicate_found = nodes
-                .iter()
-                .fold(
-                    (max_leaves, false),
-                    |(prev_x_coord, duplicate_found), node| {
-                        if duplicate_found || node.coord.x == prev_x_coord {
-                            (0, true)
-                        } else {
-                            (node.coord.x, false)
-                        }
-                    },
-                )
-                .1;
-            if duplicate_found {
-                return Err(BinaryTreeError::DuplicateLeaves);
-            }
+        //     // ensure no duplicates
+        //     let duplicate_found = nodes
+        //         .iter()
+        //         .fold(
+        //             (max_leaves, false),
+        //             |(prev_x_coord, duplicate_found), node| {
+        //                 if duplicate_found || node.coord.x == prev_x_coord {
+        //                     (0, true)
+        //                 } else {
+        //                     (node.coord.x, false)
+        //                 }
+        //             },
+        //         )
+        //         .1;
+        //     if duplicate_found {
+        //         return Err(BinaryTreeError::DuplicateLeaves);
+        //     }
 
-            nodes
-        };
+        //     nodes
+        // };
+
+        let mut nodes = nodes_from_leaves(leaves, height)?;
 
         let mut i = 0;
 
@@ -494,6 +496,55 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
             content: C::merge(&self.left.content, &self.right.content),
         }
     }
+}
+
+pub fn nodes_from_leaves<C: Clone>(
+    leaves: Vec<InputLeafNode<C>>,
+    height: u8,
+) -> Result<Vec<Node<C>>, BinaryTreeError> {
+    let max_leaves = 2u64.pow(height as u32 - 1);
+    if leaves.len() as u64 > max_leaves {
+        return Err(BinaryTreeError::TooManyLeaves);
+    }
+
+    if leaves.len() < 1 {
+        return Err(BinaryTreeError::EmptyInput);
+    }
+
+    if height < MIN_HEIGHT {
+        return Err(BinaryTreeError::HeightTooSmall);
+    }
+
+    // translate InputLeafNode to Node
+    let mut nodes: Vec<Node<C>> = leaves.into_iter().map(|leaf| leaf.to_node()).collect();
+
+    // sort by x_coord ascending
+    nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
+
+    // make sure all x_coord < max
+    if nodes.last().is_some_and(|node| node.coord.x >= max_leaves) {
+        return Err(BinaryTreeError::InvalidXCoord);
+    }
+
+    // ensure no duplicates
+    let duplicate_found = nodes
+        .iter()
+        .fold(
+            (max_leaves, false),
+            |(prev_x_coord, duplicate_found), node| {
+                if duplicate_found || node.coord.x == prev_x_coord {
+                    (0, true)
+                } else {
+                    (node.coord.x, false)
+                }
+            },
+        )
+        .1;
+    if duplicate_found {
+        return Err(BinaryTreeError::DuplicateLeaves);
+    }
+
+    Ok(nodes)
 }
 
 // ===========================================
