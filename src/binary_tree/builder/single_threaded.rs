@@ -31,9 +31,7 @@ where
 /// use dapol::binary_tree::builder::single_threaded::SingleThreadedBuilder;
 /// use dapol::binary_tree::utils::test_utils::TestContent;
 /// use dapol::binary_tree::utils::test_utils::get_padding_function;
-/// use dapol::binary_tree::Mergeable;
 /// use primitive_types::H256;
-///
 ///
 /// let height = 0;
 /// let leaf_nodes = vec![InputLeafNode { content: TestContent { value: 0, hash: H256::default() },  x_coord: 0 }];
@@ -45,7 +43,7 @@ where
 ///     .with_padding_node_generator(get_padding_function())
 ///     .build();
 /// ```
-/// ```
+
 impl<C, F> SingleThreadedBuilder<C, F>
 where
     C: Debug + Clone + Mergeable,
