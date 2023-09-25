@@ -288,14 +288,16 @@ impl<C: Mergeable + Clone> BinaryTree<C> {
         };
 
         for _i in 0..height - 1 {
-            let pairs = nodes.clone().into_iter().map(|node| node.to_pairs());
+            let iter = nodes.clone().into_iter().map(|node| node.to_pairs());
 
-            for pair in pairs {
-                let matched_pair = pair
+            let mut parents: Vec<Node<C>> = Vec::new();
+
+            for pair in iter {
+                let matched_pair_iter = pair
                     .into_iter()
                     .map(|pair| pair.to_matched_pair(&new_padding_node_content));
 
-                let parents = matched_pair
+                parents = matched_pair_iter
                     .map(|matched_pair| {
                         let parent = matched_pair.merge();
                         store.insert(matched_pair.left.coord.clone(), matched_pair.left);
@@ -303,9 +305,9 @@ impl<C: Mergeable + Clone> BinaryTree<C> {
                         parent
                     })
                     .collect();
-
-                nodes = parents;
             }
+
+            nodes = parents;
         }
 
         // // repeat for each layer of the tree
@@ -382,7 +384,7 @@ impl<C: Mergeable + Clone> BinaryTree<C> {
             "[Bug in tree constructor] Should be no nodes left to process"
         );
 
-        store.insert(root.coord.clone(), root.clone());
+        store.insert(root.clone().coord, root.clone());
 
         Ok(BinaryTree {
             root,
@@ -396,8 +398,8 @@ impl<C: Mergeable + Clone> BinaryTree<C> {
     #[allow(dead_code)]
     fn build_path_siblings(&self, leaf_x_coord: u64) -> Result<PathSiblings<C>, PathSiblingsError> {
         let coord = Coordinate {
-            y: 0,
             x: leaf_x_coord,
+            y: 0,
         };
 
         let leaf = self
