@@ -9,11 +9,10 @@
 use std::fmt::Debug;
 
 use super::{BinaryTree, Coordinate, Mergeable, MIN_HEIGHT};
-
-mod multi_threaded;
+pub mod multi_threaded;
 use multi_threaded::MultiThreadedBuilder;
 
-mod single_threaded;
+pub mod single_threaded;
 use single_threaded::SingleThreadedBuilder;
 
 // -------------------------------------------------------------------------------------------------

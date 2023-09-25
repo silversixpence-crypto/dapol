@@ -28,6 +28,7 @@ where
 /// Example:
 /// ```
 /// use dapol::binary_tree::builder::{self, TreeBuilder, InputLeafNode};
+/// use dapol::binary_tree::builder::single_threaded::SingleThreadedBuilder;
 /// use dapol::binary_tree::utils::test_utils::TestContent;
 /// use dapol::binary_tree::utils::test_utils::get_padding_function;
 /// use dapol::binary_tree::Mergeable;
@@ -39,6 +40,11 @@ where
 /// let tree = TreeBuilder::new()
 ///     .with_height(height)
 ///     .with_leaf_nodes(leaf_nodes);
+/// 
+/// let single_threaded = SingleThreadedBuilder::new(tree)
+///     .with_padding_node_generator(get_padding_function())
+///     .build();
+/// ```
 /// ```
 impl<C, F> SingleThreadedBuilder<C, F>
 where

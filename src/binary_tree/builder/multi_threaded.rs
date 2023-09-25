@@ -36,10 +36,7 @@ use rayon::prelude::*;
 use std::sync::Arc;
 use std::thread;
 
-use super::super::{
-    num_bottom_layer_nodes, Coordinate, MatchedPair, Mergeable, Node,
-    Sibling,
-};
+use super::super::{num_bottom_layer_nodes, Coordinate, MatchedPair, Mergeable, Node, Sibling};
 use super::{BinaryTree, TreeBuildError, TreeBuilder};
 
 // -------------------------------------------------------------------------------------------------
@@ -56,6 +53,7 @@ where
 /// Example:
 /// ```
 /// use dapol::binary_tree::builder::{self, TreeBuilder, InputLeafNode};
+/// use dapol::binary_tree::builder::multi_threaded::MultiThreadedBuilder;
 /// use dapol::binary_tree::utils::test_utils::TestContent;
 /// use dapol::binary_tree::utils::test_utils::get_padding_function;
 /// use dapol::binary_tree::Mergeable;
@@ -67,6 +65,10 @@ where
 /// let tree = TreeBuilder::new()
 ///     .with_height(height)
 ///     .with_leaf_nodes(leaf_nodes);
+/// 
+/// let multi_threaded = MultiThreadedBuilder::new(tree)
+///     .with_padding_node_generator(get_padding_function())
+///     .build();
 /// ```
 /// The type traits on `C` & `F` are required for thread spawning.
 impl<C, F> MultiThreadedBuilder<C, F>
@@ -447,7 +449,7 @@ mod tests {
     use crate::binary_tree::utils::test_utils::{
         full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
     };
-    use crate::testing_utils::{assert_err_simple, assert_err};
+    use crate::testing_utils::{assert_err, assert_err_simple};
 
     use primitive_types::H256;
     use rand::{thread_rng, Rng};
