@@ -503,7 +503,6 @@ pub fn nodes_from_leaves<C: Clone>(
     height: u8,
 ) -> Result<Vec<Node<C>>, BinaryTreeError> {
     let max_leaves = 2u64.pow(height as u32 - 1);
-    
     if leaves.len() as u64 > max_leaves {
         return Err(BinaryTreeError::TooManyLeaves);
     }
@@ -516,12 +515,8 @@ pub fn nodes_from_leaves<C: Clone>(
         return Err(BinaryTreeError::HeightTooSmall);
     }
 
-    let mut nodes: Vec<Node<C>> = Vec::new();
-
     // translate InputLeafNode to Node
-    for leaf in leaves {
-        nodes.push(leaf.to_node());
-    }
+    let mut nodes: Vec<Node<C>> = leaves.into_iter().map(|leaf| leaf.to_node()).collect();
 
     // sort by x_coord ascending
     nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
