@@ -27,7 +27,7 @@ pub struct Entity {
 const ENTITY_ID_MAX_LENGTH: usize = 256;
 
 /// Abstract representation of an entity ID.
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct EntityId([u8; 32]);
 
 // -------------------------------------------------------------------------------------------------
