@@ -1,11 +1,11 @@
-use std::{str::FromStr, io::Read};
+use std::{io::Read, str::FromStr};
 
-use dapol::{NdmSmt, Entity, EntityId, Secret};
+use dapol::{Entity, EntityId, NdmSmt, Secret};
 
 use core::fmt::Debug;
 use dapol::{
-    utils::get_secret, Dapol, DapolNode, RangeProofPadding, RangeProofSplitting, RangeProvable,
-    RangeVerifiable, Args
+    utils::get_secret, Args, Dapol, DapolNode, RangeProofPadding, RangeProofSplitting,
+    RangeProvable, RangeVerifiable,
 };
 use digest::Digest;
 use rand::{distributions::Uniform, thread_rng, Rng};
@@ -16,14 +16,16 @@ use smtree::{
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use env_logger;
 use clap::Parser;
+use env_logger;
 
 fn main() {
     new();
 }
 
 use serde::Deserialize;
+
+static mut ENTITY_IDS: Vec<EntityId> = Vec::new();
 
 #[derive(Debug, Deserialize)]
 struct Secrets {
@@ -41,10 +43,15 @@ fn new() {
 
     let mut args = Args::parse();
 
-    env_logger::Builder::new().filter_level(args.verbose.log_level_filter()).init();
+    env_logger::Builder::new()
+        .filter_level(args.verbose.log_level_filter())
+        .init();
 
     let mut contents = String::new();
-    args.secrets.unwrap().read_to_string(&mut contents).expect("Malformed input");
+    args.secrets
+        .unwrap()
+        .read_to_string(&mut contents)
+        .expect("Malformed input");
     let secrets: Secrets = toml::from_str(&contents).unwrap();
 
     let master_secret: Secret = Secret::from_str(secrets.master_secret.as_str()).unwrap();
@@ -99,9 +106,13 @@ fn build_item_list_new(num_leaves: usize, tree_height: usize) -> Vec<Entity> {
     for i in 0..num_leaves {
         result.push(Entity {
             liability: i as u64,
-            id: EntityId::from_str(i.to_string().as_str()).unwrap(),
-        })
+            id: EntityId::from_str(&i.to_string()).expect("Unable to generate entity ID"),
+        });
     }
+
+    verify_entity_ids(&result);
+
+    push_entity_ids(&result);
 
     let end = SystemTime::now();
     let dur = end.duration_since(start);
@@ -146,4 +157,22 @@ fn build_item_list(
     );
 
     result
+}
+
+fn verify_entity_ids(entities: &Vec<Entity>) {
+    for e in entities {
+        unsafe {
+            if ENTITY_IDS.contains(&e.id) {
+                panic!("Duplicate entity ID found: {:?}", e.id);
+            }
+        }
+    }
+}
+
+fn push_entity_ids(entities: &Vec<Entity>) {
+    for e in entities {
+        unsafe {
+            ENTITY_IDS.push(e.id);
+        }
+    }
 }
