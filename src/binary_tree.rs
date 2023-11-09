@@ -32,6 +32,7 @@
 //! `max(y)+1`. The inputted leaves used to construct the tree must contain the
 //! `x` coordinate (their `y` coordinate will be 0).
 
+use core::panic;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -358,6 +359,7 @@ enum Sibling<C> {
 // TODO we should have a `from` function for this with an error check, just to
 // be extra careful
 /// A pair of sibling nodes.
+#[derive(Clone)]
 struct MatchedPair<C> {
     left: Node<C>,
     right: Node<C>,
@@ -380,6 +382,20 @@ impl<C: Mergeable> MatchedPair<C> {
             coord: self.left.parent_coord(),
             content: C::merge(&self.left.content, &self.right.content),
         }
+    }
+}
+
+impl<C: Clone> From<Vec<Node<C>>> for MatchedPair<C> {
+    /// Create a matched pair from a vector of nodes
+    fn from(nodes: Vec<Node<C>>) -> Self {
+            if nodes.len() != 2 {
+                panic!("Two nodes are required to create a matched pair");
+            }
+
+            Self {
+                left: nodes[0].clone(),
+                right: nodes[1].clone(),
+            }
     }
 }
 
