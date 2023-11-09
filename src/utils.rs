@@ -168,7 +168,7 @@ pub mod test_utils {
     ($expression:expr, $($pattern:tt)+) => {
         match $expression {
             $($pattern)+ => (),
-            ref e => panic!("expected `{}` but got `{:?}`", stringify!($($pattern)+), e),
+            ref e => std::panic!("expected `{}` but got `{:?}`", stringify!($($pattern)+), e),
         }
     }
 }
@@ -180,7 +180,7 @@ pub mod test_utils {
         ($expression:expr, $($pattern:tt)+) => {
             match $expression {
                 $($pattern)+ => (),
-                _ => panic!("expected a specific error but did not get it"),
+                _ => std::panic!("expected a specific error but did not get it"),
             }
         }
     }

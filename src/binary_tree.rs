@@ -567,7 +567,7 @@ mod tests {
         let right_node = single_leaf(x_coord).into_node();
         let sibling = Sibling::from_node(right_node);
         match sibling {
-            Sibling::Left(_) => panic!("Node should be a right sibling"),
+            Sibling::Left(_) => std::panic!("Node should be a right sibling"),
             Sibling::Right(_) => {}
         }
 
@@ -575,7 +575,7 @@ mod tests {
         let left_node = single_leaf(x_coord).into_node();
         let sibling = Sibling::from_node(left_node);
         match sibling {
-            Sibling::Right(_) => panic!("Node should be a left sibling"),
+            Sibling::Right(_) => std::panic!("Node should be a left sibling"),
             Sibling::Left(_) => {}
         }
     }
