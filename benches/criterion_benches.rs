@@ -200,7 +200,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 /// We only loop through `tree_heights` & `num_entities` because we want proof
 /// generation to have maximum threads.
 pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
-    let mut group = c.benchmark_group("generate_proof");
+    let mut group = c.benchmark_group("proofs");
     group.sample_size(20);
 
     for h in tree_heights().iter() {
@@ -257,7 +257,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 
             group.bench_function(
                 BenchmarkId::new(
-                    "build_tree",
+                    "generate_proof",
                     format!("height_{}/num_entities_{}", h.as_u32(), n),
                 ),
                 |bench| {
@@ -275,7 +275,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 /// We only loop through `tree_heights` & `num_entities` because proof
 /// verification does not depend on number of threads.
 pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
-    let mut group = c.benchmark_group("generate_proof");
+    let mut group = c.benchmark_group("proofs");
     group.sample_size(20);
 
     for h in tree_heights().iter() {
@@ -338,7 +338,7 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
 
             group.bench_function(
                 BenchmarkId::new(
-                    "build_tree",
+                    "verify_proof",
                     format!("height_{}/num_entities_{}", h.as_u32(), n),
                 ),
                 |bench| {
