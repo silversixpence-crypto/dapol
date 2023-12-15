@@ -1,5 +1,10 @@
 # Spec for dapol codebase
 
+## Key
+
+Entity - leaf node TODO say more
+$\mathcal{C}$ - constructor of the tree
+
 ## PoL data, functions & parameters
 
 TODO say which functions these map to in the code
@@ -27,7 +32,28 @@ The value N is set to 2^H (it must be at most this value, but making it less wil
 
 ### Public parameters
 
-The paper defines the following as the Public params: group info, max liability, height, salts
+DAPOL+ requires the following public parameters to be set before generating any trees:
+
+$$\left( ( \mathbb{G}, g, h ), \mathcal{R}, N, \text{MaxL}, H, S_{\text{com}}, S_{\text{hash}} \right)$$
+
+where
+- $\mathbb{G}$ is a group of prime order, with generators $g$ & $h$ s.t. their relative logarithm is unknown
+- $N$ is the upper bound on the number of entities i.e. if $n$ is the number of entities to be modeled by the tree, then $n < N$ (note that we must have $N \le 2^H$ since that is the maximum number of bottom layer leaf node for entities)
+- $\text{MaxL}$ is the maximum liability of any single entity, and is used to determine the upper bound for the range proof: $N \text{MaxL}$
+- $H$ is the height of the tree
+- $S_{\text{com}}$ is the salt used to calculate a leaf/padding node's Pedersen commitment
+- $S_{\text{hash}}$ is the salt used to calculate a leaf/padding node's hash
+- $\mathcal{R}$ is the range proof protocol
+
+The following values are set automatically by the codebase:
+- $\mathbb{G}$ is the Ristretto group, TODO what are the generators?
+- $\mathcal{R}$ is the Bulletproofs protocol
+- $N=2^H$ because why would anyone want to publicly lower the upper bound?
+- $\text{MaxL}=2^{B-H}$ so that the upper bound is $2^B$ where $B$ is set by $\mathcal{C}$ (the Bulletproofs library requires a power of 2 as the upper bound)
+
+These values can be set by $\mathcal{C}$
+- $B$ which is the bit length of the range proof upper bound (defaults to 64)
+- Both the salts (randomly generated if not set)
 
 ## Dependencies
 
