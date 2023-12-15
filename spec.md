@@ -1,0 +1,85 @@
+# Spec for dapol codebase
+
+## PoL data, functions & parameters
+
+TODO say which functions these map to in the code
+functions from paper:
+- Setup: produces the root hash & commitment
+- ProveTot: reveal the blinding factor and the liability sum
+- VerifyTot: not included in code
+- Prove: inclusion proof generation
+- Verify: verify inclusion proof
+
+Must explain the 3 data things from the paper:
+- PD (public data): root hash & com
+- SD (secret data): master secret & user mapping (if ndm smt)
+
+master secret & salts:
+- it is advised to keep master secret the same across PoLs so that users only need to fetch w_u once from the exchange, and then can just generate the rest of the data for each PoL on their own
+- salts should be changed for each PoL
+
+list of things that the tree owner stores and must keep secret:
+- master secret - exposing this will mean leaf node IDs & blinding factors could be brute-forced
+- user mapping (if ndm smt) - exposing this will leak user IDs and where they are mapped to on the tree
+- tree - the security & privacy proofs seem to require the tree to be held by the exchange (need to dig into more detail here)
+
+The value N is set to 2^H (it must be at most this value, but making it less will leak some privacy), note that this value can be chosen arbitrarily as long as n <= N <= 2^H where n is the number of entities
+
+### Public parameters
+
+The paper defines the following as the Public params: group info, max liability, height, salts
+
+## Dependencies
+
+TODO get link for ristretto codebase
+The paper wants g_1 & g_2 generators of G such that their relative discrete logarithm is unknown. We should state in the spec that this is the case with Ristretto 25519 and why and where that code lives.
+
+kdf used is HKDF-SHA256 https://datatracker.ietf.org/doc/html/rfc5869
+- TODO get link to code
+
+Bulletproofs TODO get link to code
+- Bulletproofs is the range proof protocol chosen because it is efficient, allows aggregation, and has no trusted setup
+- the pedersen commitment code comes from the bulletproofs library
+- also obv the code is used for range proofs
+
+### Bulletproofs code
+
+upper bound bit length can only be one of: 8 16 32 64, otherwise the bulletproof library will throw an error
+
+We should document the default group elements used here, and put them in the spec. e.g. in hidden_node.rs there is this line:
+```rust
+        let commitment = PedersenGens::default().commit(
+            Scalar::from(liability),
+            Scalar::from_bytes_mod_order(blinding_factor.into()),
+        );
+```
+
+## Limits & types
+
+max height: 64
+min height: 2
+height is u8 since 2^8 = 256 is more than big enough as the maximum possible height
+64 was chosen as the max height because with the NDM SMT we can have 2^36 (~70B) entities and still have only 10^-9 of the bottom layer spaces filled. With DM SMT we may need to increase this max.
+
+## Fixes
+
+TODO link to doc explaining this
+note the "Durstenfeld’s shuffle algorithm optimized by HashMap" for the ndm_smt is actually broken, the fixed version is in the code
+
+## Code details
+
+A hash map is used to store the nodes when building the tree
+
+panic if there is a bug in the code. if the input is incorrect then return an error result, so that calling code can take action.
+
+### Naming & orientation
+
+paper uses term idx but code uses coordinate
+
+y-coord is 0 where the bottom leaves are and height-1 where the root node is
+x-coord is 0 at the left of the tree (imagine the tree squashed to the left making it seem slanted on the right)
+
+### Knobs to adjust efficiency trade-offs
+
+Store depth TODO
+
