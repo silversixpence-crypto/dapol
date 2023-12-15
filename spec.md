@@ -1,9 +1,11 @@
 # Spec for dapol codebase
 
+Rust is the language used TODO why?
+
 ## Key
 
 Entity - leaf node TODO say more
-$\mathcal{C}$ - constructor of the tree
+$\mathcal{P}$ - constructor of the tree
 
 ## PoL data, functions & parameters
 
@@ -49,29 +51,31 @@ The following values are set automatically by the codebase:
 - $\mathbb{G}$ is the Ristretto group, TODO what are the generators?
 - $\mathcal{R}$ is the Bulletproofs protocol
 - $N=2^H$ because why would anyone want to publicly lower the upper bound?
-- $\text{MaxL}=2^{B-H}$ so that the upper bound is $2^B$ where $B$ is set by $\mathcal{C}$ (the Bulletproofs library requires a power of 2 as the upper bound)
+- $\text{MaxL}=2^{B-H}$ so that the upper bound is $2^B$ where $B$ is set by $\mathcal{P}$ (the Bulletproofs library requires a power of 2 as the upper bound)
 
-These values can be set by $\mathcal{C}$
+These values can be set by $\mathcal{P}$
 - $B$ which is the bit length of the range proof upper bound (defaults to 64)
 - Both the salts (randomly generated if not set)
 
 ## Dependencies
 
+The KDF protocol used is HKDF-SHA256 https://datatracker.ietf.org/doc/html/rfc5869 and the implementation used in the [hkdf rust crate](https://docs.rs/hkdf/latest/hkdf/).
+
+### Ristretto group
+
 TODO get link for ristretto codebase
 The paper wants g_1 & g_2 generators of G such that their relative discrete logarithm is unknown. We should state in the spec that this is the case with Ristretto 25519 and why and where that code lives.
 
-kdf used is HKDF-SHA256 https://datatracker.ietf.org/doc/html/rfc5869
-- TODO get link to code
+### Bulletproofs
 
-Bulletproofs TODO get link to code
-- Bulletproofs is the range proof protocol chosen because it is efficient, allows aggregation, and has no trusted setup
-- the pedersen commitment code comes from the bulletproofs library
-- also obv the code is used for range proofs
+Bulletproofs is chosen as the range proof protocol because it is efficient, allows aggregation, and has no trusted setup. This is the range proof protocol suggested by the paper.
 
-### Bulletproofs code
+The following codebase is used as the implementation: [zkcrypto/bulletproofs](https://github.com/zkcrypto/bulletproofs). There is another codebase available but it has weaker performance than the one currently being used. There is some funny business with the cargo crate versions, which is detailed [here](https://github.com/zkcrypto/bulletproofs/issues/15).
 
-upper bound bit length can only be one of: 8 16 32 64, otherwise the bulletproof library will throw an error
+When calculating a range proof the upper bound parameter is a bit length, which means only powers of 2 are supported. More than that, the upper bound bit length can only be one of: 8 16 32 64, otherwise the library will throw an error.
 
+The Bulletproofs code is also used for calculating Pedersen commitments.
+TODO:
 We should document the default group elements used here, and put them in the spec. e.g. in hidden_node.rs there is this line:
 ```rust
         let commitment = PedersenGens::default().commit(
@@ -79,13 +83,6 @@ We should document the default group elements used here, and put them in the spe
             Scalar::from_bytes_mod_order(blinding_factor.into()),
         );
 ```
-
-## Limits & types
-
-max height: 64
-min height: 2
-height is u8 since 2^8 = 256 is more than big enough as the maximum possible height
-64 was chosen as the max height because with the NDM SMT we can have 2^36 (~70B) entities and still have only 10^-9 of the bottom layer spaces filled. With DM SMT we may need to increase this max.
 
 ## Fixes
 
@@ -98,6 +95,13 @@ A hash map is used to store the nodes when building the tree
 
 panic if there is a bug in the code. if the input is incorrect then return an error result, so that calling code can take action.
 
+### Limits & types
+
+max height: 64
+min height: 2
+height is u8 since 2^8 = 256 is more than big enough as the maximum possible height
+64 was chosen as the max height because with the NDM SMT we can have 2^36 (~70B) entities and still have only 10^-9 of the bottom layer spaces filled. With DM SMT we may need to increase this max.
+
 ### Naming & orientation
 
 paper uses term idx but code uses coordinate
@@ -105,7 +109,7 @@ paper uses term idx but code uses coordinate
 y-coord is 0 where the bottom leaves are and height-1 where the root node is
 x-coord is 0 at the left of the tree (imagine the tree squashed to the left making it seem slanted on the right)
 
-### Knobs to adjust efficiency trade-offs
+### Knobs $\mathcal{P}$ can use to adjust efficiency trade-offs
 
 Store depth TODO
 
