@@ -4,10 +4,18 @@ Rust is the language used TODO why?
 
 ## Key
 
-Entity - leaf node TODO say more
+Entity (aka user) - Represents the a single unit of the external data that is to be modeled by the PoL. Each entity has an ID ($\text{id}_u$) and a liability ($l_u$).
+
 $\mathcal{P}$ - constructor of the tree
 
+PBB - (public bulletin board)
+
 ## PoL data, functions & parameters
+
+list of things that the tree owner stores and must keep secret:
+- tree - the security & privacy proofs seem to require the tree to be held by the exchange (need to dig into more detail here)
+
+### Functions
 
 TODO say which functions these map to in the code
 functions from paper:
@@ -16,21 +24,6 @@ functions from paper:
 - VerifyTot: not included in code
 - Prove: inclusion proof generation
 - Verify: verify inclusion proof
-
-Must explain the 3 data things from the paper:
-- PD (public data): root hash & com
-- SD (secret data): master secret & user mapping (if ndm smt)
-
-master secret & salts:
-- it is advised to keep master secret the same across PoLs so that users only need to fetch w_u once from the exchange, and then can just generate the rest of the data for each PoL on their own
-- salts should be changed for each PoL
-
-list of things that the tree owner stores and must keep secret:
-- master secret - exposing this will mean leaf node IDs & blinding factors could be brute-forced
-- user mapping (if ndm smt) - exposing this will leak user IDs and where they are mapped to on the tree
-- tree - the security & privacy proofs seem to require the tree to be held by the exchange (need to dig into more detail here)
-
-The value N is set to 2^H (it must be at most this value, but making it less will leak some privacy), note that this value can be chosen arbitrarily as long as n <= N <= 2^H where n is the number of entities
 
 ### Public parameters
 
@@ -56,6 +49,45 @@ The following values are set automatically by the codebase:
 These values can be set by $\mathcal{P}$
 - $B$ which is the bit length of the range proof upper bound (defaults to 64)
 - Both the salts (randomly generated if not set)
+
+Both the salts should be changed for each PoL generated TODO say why (involves brute force attacks and master secret)
+
+### Public data (PD)
+
+Each tree in DAPOL+ has a PD tuple which needs to be posted on a PBB for the PoL protocol to function properly.
+
+$$PD = (C_{\text{root}}, H_{\text{root}})$$PD
+
+The hash & Pedersen commitment of the root node.
+
+This data is available in the API via TODO
+
+### Secret data (SD)
+
+As with PD there is an SD tuple for each tree:
+
+$$SD = (M, \epsilon)$$
+
+where $M$ is the master secret and $\epsilon$ is a map from entity to leaf node (only required for the NDM SMT). 
+
+#### $M$
+
+$M$ must be kept seen only by $\mathcal{P}$ because exposing this would mean $\text{id}_u$'s & $l_i$'s could be guessed by brute-force method (if the ID space used is small enough and IDs have low entropy):
+1. An adversary ($\mathcal{A}$) gains access to a leaf node's data (hash & Pedersen commitment)
+1. $athcal{A}$ guesses $\text{id}_u$ and calculates $w_u = \text{KDF}(M, \text{id}_u)$
+2. $athcal{A}$ calculates $s_u = \text{KDF}(w_u, S_{\text{hash}})$
+3. $athcal{A}$ calculates $h_u = \text{hash}(\text{"leaf"} | \text{id}_u | s_u)
+4. If $h_u$ is equal to the hash of the leaf node then $\mathcal{A}$ has guessed $\text{id}_u$ correctly, otherwise go back to #1
+
+TODO what if you have multiple $w_u$'s and id_u's? can you try find the master secret?
+
+The paper advises to keep $M$ the same across PoLs so that users only need to request $w_u = \text{KDF}(M, \text{id}_u)$ from the exchange once. TODO say more TODO say why having the same master secret is not a security concern
+
+#### $\epsilon$
+
+The user mapping (if using an NDM SMT) must be known only by $\mathcal{P}$ because exposing this will leak user IDs and where they are mapped to on the tree.
+
+In the code $\epsilon$ is a hashmap from entity ID to x-coordinate on the bottom layer of the tree.
 
 ## Dependencies
 
