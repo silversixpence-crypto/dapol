@@ -111,10 +111,9 @@ $g_1$ is set to the point defined [here](https://github.com/zkcrypto/curve25519-
 
 $g_2$ is formed from the SHA3-512 hash of $g_1$ using [this function](https://github.com/zkcrypto/curve25519-dalek-ng/blob/763a0faaf54752b06702b39e2296173ab76c2204/src/ristretto.rs#L688), which claims that the that "the discrete log of the output point with respect to any other point should be unknown".
 
-## Fixes
+## NDM-SMT shuffle algorithm
 
-TODO link to doc explaining this
-note the "Durstenfeld’s shuffle algorithm optimized by HashMap" for the ndm_smt is actually broken, the fixed version is in the code
+"Durstenfeld’s shuffle algorithm optimized by HashMap" is explained in the paper, but contains a minor error. The error is fixed in the implementation. More details can be found [here](https://hackmd.io/@JI2FtqawSzO-olUw-r48DQ/Hka8tkdNT).
 
 ## Code details
 
