@@ -123,10 +123,10 @@ panic if there is a bug in the code. if the input is incorrect then return an er
 
 ### Limits & types
 
-max height: 64
-min height: 2
-height is u8 since 2^8 = 256 is more than big enough as the maximum possible height
-64 was chosen as the max height because with the NDM SMT we can have 2^36 (~70B) entities and still have only 10^-9 of the bottom layer spaces filled. With DM SMT we may need to increase this max.
+For the tree height:
+- max height: 64 (64 was chosen as the max height because with the NDM SMT we can have $2^36$ ($~70\text{B}$) entities and still have only $10^-9$ of the bottom layer spaces filled. With DM SMT we may need to increase this max.)
+- min height: 2
+- type: u8 (2^8 = 256 is more than big enough as the maximum possible height)
 
 ### Naming & orientation
 
