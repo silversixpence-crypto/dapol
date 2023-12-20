@@ -2,11 +2,9 @@
 
 Rust is the language used TODO why?
 
-## Key
-
-Entity (aka user) - Represents the a single unit of the external data that is to be modeled by the PoL. Each entity has an ID ($\text{id}_u$) and a liability ($l_u$).
-
-$\mathcal{P}$ - constructor of the tree
+Key
+- Entity (aka user) - Represents a single unit of the external data that is to be modeled by the PoL. Each entity has an ID ($\text{id}_u$) and a liability ($l_u$).
+- $\mathcal{P}$ - constructor of the tree
 
 PBB - (public bulletin board)
 
@@ -68,7 +66,7 @@ As with PD there is an SD tuple for each tree:
 
 $$SD = (M, \epsilon)$$
 
-where $M$ is the master secret and $\epsilon$ is a map from entity to leaf node (only required for the NDM SMT). 
+where $M$ is the master secret and $\epsilon$ is a map from entity to leaf node (only required for the NDM SMT).
 
 #### $M$
 
@@ -93,11 +91,6 @@ In the code $\epsilon$ is a hashmap from entity ID to x-coordinate on the bottom
 
 The KDF protocol used is HKDF-SHA256 https://datatracker.ietf.org/doc/html/rfc5869 and the implementation used in the [hkdf rust crate](https://docs.rs/hkdf/latest/hkdf/).
 
-### Ristretto group
-
-TODO get link for ristretto codebase
-The paper wants g_1 & g_2 generators of G such that their relative discrete logarithm is unknown. We should state in the spec that this is the case with Ristretto 25519 and why and where that code lives.
-
 ### Bulletproofs
 
 Bulletproofs is chosen as the range proof protocol because it is efficient, allows aggregation, and has no trusted setup. This is the range proof protocol suggested by the paper.
@@ -106,15 +99,17 @@ The following codebase is used as the implementation: [zkcrypto/bulletproofs](ht
 
 When calculating a range proof the upper bound parameter is a bit length, which means only powers of 2 are supported. More than that, the upper bound bit length can only be one of: 8 16 32 64, otherwise the library will throw an error.
 
-The Bulletproofs code is also used for calculating Pedersen commitments.
-TODO:
-We should document the default group elements used here, and put them in the spec. e.g. in hidden_node.rs there is this line:
-```rust
-        let commitment = PedersenGens::default().commit(
-            Scalar::from(liability),
-            Scalar::from_bytes_mod_order(blinding_factor.into()),
-        );
-```
+The Bulletproofs code is also used for calculating Pedersen commitments, and the following section provides details.
+
+### Ristretto
+
+The [Ristretto Group](https://ristretto.group) for Curve25519 as the elliptic curve group for the Pedersen commitments. [curve25519-dalek-ng](https://github.com/zkcrypto/curve25519-dalek-ng) is the rust implementation used, which is a fork of [curve25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek/) (see [this gh issue](https://github.com/zkcrypto/bulletproofs/issues/15) for details on the fork).
+
+The paper requires 2 generators of $G$, $g_1$ & $g_2$, such that their relative discrete logarithm is unknown.
+
+$g_1$ is set to the point defined [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/763a0faaf54752b06702b39e2296173ab76c2204/src/backend/serial/u64/constants.rs#L129), which is exactly the same as the point used in the Bulletproofs implementation. The point is said to be the 'Ed25519 basepoint' but it is not clear if the point is equal to the one defined in [the RFC for Ed25519](https://datatracker.ietf.org/doc/html/rfc8032) or the base point for Curve25519 given by [SafeCurves](https://safecurves.cr.yp.to/base.html). The differences may be due to different encoding methods (dalek encoding of field elements is explained [here](https://doc-internal.dalek.rs/curve25519_dalek/backend/serial/u64/field/struct.FieldElement51.html)). The order of the base point [is said to be](https://github.com/zkcrypto/curve25519-dalek-ng/blob/763a0faaf54752b06702b39e2296173ab76c2204/src/backend/serial/u64/constants.rs#L95) the prime $2^252 + 27742317777372353535851937790883648493$, which is the same as the order of the other 2 base points in the literature, and will produce a subgroup of co-factor 8 (which is what we what, essentially).
+
+$g_2$ is formed from the SHA3-512 hash of $g_1$ using [this function](https://github.com/zkcrypto/curve25519-dalek-ng/blob/763a0faaf54752b06702b39e2296173ab76c2204/src/ristretto.rs#L688), which claims that the that "the discrete log of the output point with respect to any other point should be unknown".
 
 ## Fixes
 
