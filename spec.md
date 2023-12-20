@@ -1,17 +1,13 @@
 # Spec for dapol codebase
 
-Rust is the language used TODO why?
+The implementation is written in Rust due to a) the readily available libraries for Bulletproofs & other ZK crypto, and b) the performance benefits, as building the tree is an expensive computation for real-world input sizes.
 
-Key
+**Key:**
 - Entity (aka user) - Represents a single unit of the external data that is to be modeled by the PoL. Each entity has an ID ($\text{id}_u$) and a liability ($l_u$).
 - $\mathcal{P}$ - constructor of the tree
-
-PBB - (public bulletin board)
+- PBB - (public bulletin board)
 
 ## PoL data, functions & parameters
-
-list of things that the tree owner stores and must keep secret:
-- tree - the security & privacy proofs seem to require the tree to be held by the exchange (need to dig into more detail here)
 
 ### Functions
 
@@ -86,6 +82,10 @@ The paper advises to keep $M$ the same across PoLs so that users only need to re
 The user mapping (if using an NDM SMT) must be known only by $\mathcal{P}$ because exposing this will leak user IDs and where they are mapped to on the tree.
 
 In the code $\epsilon$ is a hashmap from entity ID to x-coordinate on the bottom layer of the tree.
+
+### Tree
+
+The security & privacy proofs in the paper assume the tree is held by $\mathcal{P}$ and so it is recommended that the tree be kept secret and inclusion proofs only given out to authenticated entities.
 
 ## Dependencies
 
