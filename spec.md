@@ -89,7 +89,11 @@ In the code $\epsilon$ is a hashmap from entity ID to x-coordinate on the bottom
 
 ## Dependencies
 
-The KDF protocol used is HKDF-SHA256 https://datatracker.ietf.org/doc/html/rfc5869 and the implementation used in the [hkdf rust crate](https://docs.rs/hkdf/latest/hkdf/).
+The KDF protocol used is [HKDF-SHA256](https://datatracker.ietf.org/doc/html/rfc5869) with [this implementation](https://docs.rs/hkdf/latest/hkdf/). The implementation requires a hash function; [SHA256](https://docs.rs/sha2/latest/sha2/) is used.
+
+[blake3](https://docs.rs/blake3/latest/blake3/) is used as the hash function to construct the Merkle tree.
+
+[`thread_rng` from rand](https://docs.rs/rand/latest/rand/rngs/struct.ThreadRng.html) is used as the CSPRNG for the shuffle algorithm for the NDM SMT.
 
 ### Bulletproofs
 
@@ -117,6 +121,8 @@ $g_2$ is formed from the SHA3-512 hash of $g_1$ using [this function](https://gi
 
 ## Code details
 
+TODO
+
 A hash map is used to store the nodes when building the tree
 
 panic if there is a bug in the code. if the input is incorrect then return an error result, so that calling code can take action.
@@ -128,7 +134,11 @@ For the tree height:
 - min height: 2
 - type: u8 (2^8 = 256 is more than big enough as the maximum possible height)
 
+TODO more
+
 ### Naming & orientation
+
+TODO
 
 paper uses term idx but code uses coordinate
 
