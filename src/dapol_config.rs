@@ -1,8 +1,8 @@
-use std::path::PathBuf;
-
 use derive_builder::Builder;
 use log::{debug, info};
 use serde::Deserialize;
+use std::path::PathBuf;
+use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use crate::{
     accumulators::AccumulatorType,
@@ -108,37 +108,8 @@ pub struct EntityConfig {
     num_random_entities: Option<u64>,
 }
 
-impl DapolConfig {
-    /// Try to construct a [crate][DapolTree] from the config.
-    pub fn parse(self) -> Result<DapolTree, DapolConfigError> {
-        debug!("Parsing config to create a new DAPOL tree: {:?}", self);
-
-        let entities = EntitiesParser::new()
-            .with_path_opt(self.entities.file_path)
-            .with_num_entities_opt(self.entities.num_random_entities)
-            .parse_file_or_generate_random()?;
-
-        let dapol_tree = DapolTree::new(
-            self.accumulator_type,
-            self.master_secret,
-            self.salt_b,
-            self.salt_s,
-            self.max_liability,
-            self.max_thread_count,
-            self.height,
-            self.entities,
-        )
-        .log_on_err()?;
-
-        info!(
-            // STENT TODO you must post the root commitment too, and it also needs to get checked when doing inclusion proofs
-            "Successfully built DAPOL tree with root hash {:?}",
-            dapol_tree.root_hash()
-        );
-
-        Ok(dapol_tree)
-    }
-}
+// -------------------------------------------------------------------------------------------------
+// Builder.
 
 impl DapolConfigBuilder {
     /// Set the path for the file containing the entity data.
@@ -234,13 +205,117 @@ impl DapolConfigBuilder {
     }
 }
 
-/// Errors encountered when parsing [crate][accumulators][DapolConfig].
+// -------------------------------------------------------------------------------------------------
+// Deserialization & parsing.
+
+impl DapolConfig {
+    /// Open the file, then try to create the [DapolConfig] struct.
+    ///
+    /// An error is returned if:
+    /// 1. The file cannot be opened.
+    /// 2. The file cannot be read.
+    /// 3. The file type is not supported.
+    ///
+    /// Config deserialization example:
+    /// ```
+    /// use std::path::PathBuf;
+    /// use dapol::DapolConfig;
+    ///
+    /// let file_path = PathBuf::from("./examples/tree_config_example.toml");
+    /// let config = DapolConfig::deserialize(file_path).unwrap();
+    /// ```
+    pub fn deserialize(config_file_path: PathBuf) -> Result<Self, DapolConfigError> {
+        debug!(
+            "Attempting to deserialize {:?} as a file containing DAPOL config",
+            config_file_path.clone().into_os_string()
+        );
+
+        let ext = config_file_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .ok_or(DapolConfigError::UnknownFileType(
+                config_file_path.clone().into_os_string(),
+            ))?;
+
+        let config = match FileType::from_str(ext)? {
+            FileType::Toml => {
+                let mut buf = String::new();
+                File::open(config_file_path)?.read_to_string(&mut buf)?;
+                let config: DapolConfig = toml::from_str(&buf)?;
+                config
+            }
+        };
+
+        debug!("Successfully deserialized DAPOL config file");
+
+        Ok(config)
+    }
+
+    /// Try to construct a [crate][DapolTree] from the config.
+    pub fn parse(self) -> Result<DapolTree, DapolConfigError> {
+        debug!("Parsing config to create a new DAPOL tree: {:?}", self);
+
+        let entities = EntitiesParser::new()
+            .with_path_opt(self.entities.file_path)
+            .with_num_entities_opt(self.entities.num_random_entities)
+            .parse_file_or_generate_random()?;
+
+        let dapol_tree = DapolTree::new(
+            self.accumulator_type,
+            self.master_secret,
+            self.salt_b,
+            self.salt_s,
+            self.max_liability,
+            self.max_thread_count,
+            self.height,
+            self.entities,
+        )
+        .log_on_err()?;
+
+        info!(
+            // STENT TODO you must post the root commitment too, and it also needs to get checked when doing inclusion proofs
+            "Successfully built DAPOL tree with root hash {:?}",
+            dapol_tree.root_hash()
+        );
+
+        Ok(dapol_tree)
+    }
+}
+
+/// Supported file types for deserialization.
+enum FileType {
+    Toml,
+}
+
+impl FromStr for FileType {
+    type Err = DapolConfigError;
+
+    fn from_str(ext: &str) -> Result<FileType, Self::Err> {
+        match ext {
+            "toml" => Ok(FileType::Toml),
+            _ => Err(DapolConfigError::UnsupportedFileType { ext: ext.into() }),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Errors.
+
+/// Errors encountered when parsing [crate][DapolConfig].
 #[derive(thiserror::Error, Debug)]
 pub enum DapolConfigError {
     #[error("Entities parsing failed while trying to parse NDM-SMT config")]
     EntitiesError(#[from] entity::EntitiesParserError),
     #[error("Tree construction failed after parsing NDM-SMT config")]
     BuildError(#[from] DapolTreeError),
+    #[error("Unable to find file extension for path {0:?}")]
+    UnknownFileType(OsString),
+    #[error("The file type with extension {ext:?} is not supported")]
+    UnsupportedFileType { ext: String },
+    #[error("Error reading the file")]
+    FileReadError(#[from] std::io::Error),
+    #[error("Deserialization process failed")]
+    DeserializationError(#[from] toml::de::Error),
 }
 
 // -------------------------------------------------------------------------------------------------
