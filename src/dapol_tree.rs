@@ -1,18 +1,3 @@
-//! Proof of Liabilities Merkle Sum Tree.
-//!
-//! This is the top-most module in the hierarchy of the [dapol] crate.
-//!
-// STENT TODO this doc stuff needs to change
-//! Trees can be constructed via the configuration parsers:
-//! - [AccumulatorConfig] is used to deserialize config from a file (the
-//! specific type of accumulator is determined from the config file). After
-//! parsing the config the accumulator can be constructed.
-//! - [NdmSmtConfigBuilder] is used to construct the
-//! config for the NDM-SMT accumulator type using a builder pattern. The config
-//! can then be parsed to construct an NDM-SMT.
-//!
-// STENT TODO give example usage
-
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -21,7 +6,7 @@ use crate::{
     accumulators::{Accumulator, NdmSmtError},
     read_write_utils::{self, ReadWriteError},
     utils::LogOnErr,
-    AggregationFactor, EntityId, Height, InclusionProof, Salt, Secret,
+    AggregationFactor, Entity, Height, InclusionProof, Salt, Secret, MaxThreadCount,
 };
 
 // STENT TODO should we change the extension to 'dapol'?
@@ -29,20 +14,20 @@ const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
 // STENT TODO we should change this 'cause it's from the old accumulator code, but not sure to what, maybe 'proof_of_liabilities_merkle_sum_tree'
 const SERIALIZED_TREE_FILE_PREFIX: &str = "accumulator_";
 
-/// Main struct.
+/// Proof of Liabilities Sparse Merkle Sum Tree.
 ///
-/// `accumulator`: contains all the nodes, and defines the tree building
-/// algorithm
-/// `master_secret`: known only to the tree generator, this is used to
-/// determine all secret values for the tree
-/// `salt_s`: public value that is used to aid the KDF when generating secret
-/// salt values, which are in turn used in the hash function when generating
-/// node hashes
-/// `salt_b`: public value that is used to aid the KDF when generating secret
-/// blinding factors for the Pedersen commitments
-/// `max_liability`: public value representing the maximum amount that any
-/// single entity's liability can be, and is used in the range proofs:
-/// $[0, 2^{\text{height}} \times \text{max_liability}]$
+/// This is the top-most module in the hierarchy of the [dapol] crate.
+///
+// STENT TODO this doc stuff needs to change
+/// Trees can be constructed via the configuration parsers:
+/// - [AccumulatorConfig] is used to deserialize config from a file (the
+/// specific type of accumulator is determined from the config file). After
+/// parsing the config the accumulator can be constructed.
+/// - [NdmSmtConfigBuilder] is used to construct the
+/// config for the NDM-SMT accumulator type using a builder pattern. The config
+/// can then be parsed to construct an NDM-SMT.
+///
+// STENT TODO give example usage
 #[derive(Serialize, Deserialize)]
 pub struct DapolTree {
     accumulator: Accumulator,
@@ -50,6 +35,30 @@ pub struct DapolTree {
     salt_s: Salt,
     salt_b: Salt,
     max_liability: u64,
+}
+
+// -------------------------------------------------------------------------------------------------
+// Construction.
+
+impl DapolTree {
+    pub fn new(
+        accumulator_type: String,
+        master_secret: Secret,
+        salt_s: Salt,
+        salt_b: Salt,
+        max_liability: u64,
+        max_thread_count: MaxThreadCount,
+        height: Height,
+        entities: Vec<Entity>
+    ) -> Result<Self, DapolTreeError> {
+        DapolTree {
+            accumulator,
+            master_secret,
+            salt_s,
+            salt_b,
+            max_liability,
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -107,7 +116,7 @@ impl DapolTree {
     /// An error is logged and returned if
     /// 1. The file cannot be opened.
     /// 2. The [bincode] deserializer fails.
-    pub fn deserialize(path: PathBuf) -> Result<DapolTree, AccumulatorError> {
+    pub fn deserialize(path: PathBuf) -> Result<DapolTree, DapolTreeError> {
         debug!(
             "Deserializing accumulator from file {:?}",
             path.clone().into_os_string()
@@ -177,7 +186,7 @@ impl DapolTree {
     /// An error is returned if
     /// 1. [bincode] fails to serialize the file.
     /// 2. There is an issue opening or writing the file.
-    pub fn serialize(&self, path: PathBuf) -> Result<(), AccumulatorError> {
+    pub fn serialize(&self, path: PathBuf) -> Result<(), DapolTreeError> {
         info!(
             "Serializing accumulator to file {:?}",
             path.clone().into_os_string()
@@ -237,7 +246,7 @@ impl DapolTree {
 
 /// Errors encountered when handling an [Accumulator].
 #[derive(thiserror::Error, Debug)]
-pub enum AccumulatorError {
+pub enum DapolTreeError {
     #[error("Error serializing/deserializing file")]
     SerdeError(#[from] ReadWriteError),
 }

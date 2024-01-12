@@ -3,6 +3,7 @@
 // (see LICENSE or <http://opensource.org/licenses/MIT>) All files in the project carrying such
 // notice may not be copied, modified, or distributed except according to those terms.
 
+// STENT TODO need to fix all the docs & examples here to use DapolTree
 //! # Proof of Liabilities protocol implemented in Rust
 //!
 //! Implementation of the DAPOL+ protocol introduced in the "Generalized Proof of Liabilities" by Yan Ji and Konstantinos Chalkias ACM CCS 2021 paper, available [here](https://eprint.iacr.org/2021/1350)
@@ -167,7 +168,9 @@ pub mod read_write_utils;
 pub mod utils;
 
 mod dapol_tree;
-pub use dapol_tree::DapolTree;
+pub use dapol_tree::{DapolTree, DapolTreeError};
+
+mod dapol_config;
 
 mod salt;
 pub use salt::Salt;
