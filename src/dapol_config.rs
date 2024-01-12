@@ -4,6 +4,7 @@ use serde::Deserialize;
 use std::path::PathBuf;
 use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
+use crate::{secret, salt};
 use crate::{
     accumulators::AccumulatorType,
     entity::{self, EntitiesParser},
@@ -92,9 +93,9 @@ use crate::{
 #[builder(build_fn(skip))]
 pub struct DapolConfig {
     accumulator_type: AccumulatorType,
-    master_secret: Secret,
-    salt_b: Salt,
-    salt_s: Salt,
+    master_secret: String,
+    salt_b: String,
+    salt_s: String,
     max_liability: u64,
     height: Height,
     max_thread_count: MaxThreadCount,
@@ -255,6 +256,10 @@ impl DapolConfig {
     pub fn parse(self) -> Result<DapolTree, DapolConfigError> {
         debug!("Parsing config to create a new DAPOL tree: {:?}", self);
 
+        let master_secret = Secret::from_str(&self.master_secret)?;
+        let salt_b = Salt::from_str(&self.salt_b)?;
+        let salt_s = Salt::from_str(&self.salt_s)?;
+
         let entities = EntitiesParser::new()
             .with_path_opt(self.entities.file_path)
             .with_num_entities_opt(self.entities.num_random_entities)
@@ -262,9 +267,9 @@ impl DapolConfig {
 
         let dapol_tree = DapolTree::new(
             self.accumulator_type,
-            self.master_secret,
-            self.salt_b,
-            self.salt_s,
+            master_secret,
+            salt_b,
+            salt_s,
             self.max_liability,
             self.max_thread_count,
             self.height,
@@ -304,8 +309,12 @@ impl FromStr for FileType {
 /// Errors encountered when parsing [crate][DapolConfig].
 #[derive(thiserror::Error, Debug)]
 pub enum DapolConfigError {
-    #[error("Entities parsing failed while trying to parse NDM-SMT config")]
+    #[error("Entities parsing failed while trying to parse DAPOL config")]
     EntitiesError(#[from] entity::EntitiesParserError),
+    #[error("Error parsing the master secret string")]
+    MasterSecretParseError(#[from] secret::SecretParserError),
+    #[error("Error parsing the salt string")]
+    SaltParseError(#[from] salt::SaltParserError),
     #[error("Tree construction failed after parsing NDM-SMT config")]
     BuildError(#[from] DapolTreeError),
     #[error("Unable to find file extension for path {0:?}")]
