@@ -86,8 +86,8 @@ impl NdmSmtConfig {
     pub fn parse(self) -> Result<NdmSmt, NdmSmtConfigParserError> {
         debug!("Parsing config to create a new NDM-SMT: {:?}", self);
 
-        let secrets = NdmSmtSecretsParser::from(self.secrets_file_path)
-            .parse_or_generate_random()?;
+        let secrets =
+            NdmSmtSecretsParser::from(self.secrets_file_path).parse_or_generate_random()?;
 
         let height = self.height;
         let max_thread_count = self.max_thread_count;

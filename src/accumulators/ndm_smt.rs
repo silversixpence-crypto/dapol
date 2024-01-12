@@ -8,15 +8,15 @@ use logging_timer::{timer, Level};
 
 use rayon::prelude::*;
 
+use crate::binary_tree::FullNodeContent;
 use crate::binary_tree::{
-    BinaryTree, Coordinate, Height, InputLeafNode, PathSiblings, BinaryTreeBuilder,
+    BinaryTree, BinaryTreeBuilder, Coordinate, Height, InputLeafNode, PathSiblings,
 };
 use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{
     AggregationFactor, InclusionProof, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
 };
 use crate::kdf::generate_key;
-use crate::binary_tree::FullNodeContent;
 use crate::MaxThreadCount;
 
 mod ndm_smt_secrets;
@@ -55,8 +55,9 @@ type Content = FullNodeContent;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NdmSmt {
+    // STENT TODO remove secrets here
     secrets: NdmSmtSecrets,
-    tree: BinaryTree<Content>,
+    binary_tree: BinaryTree<Content>,
     entity_mapping: HashMap<EntityId, u64>,
 }
 
@@ -98,9 +99,18 @@ impl NdmSmt {
              - salt s: 0x{}",
             height.as_u32(),
             entities.len(),
-            master_secret_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
-            salt_b_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
-            salt_s_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+            master_secret_bytes
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
+            salt_b_bytes
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
+            salt_s_bytes
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
         );
 
         let (leaf_nodes, entity_coord_tuples) = {
@@ -173,7 +183,7 @@ impl NdmSmt {
             ))?;
 
         Ok(NdmSmt {
-            tree,
+            binary_tree: tree,
             secrets,
             entity_mapping,
         })
@@ -213,11 +223,11 @@ impl NdmSmt {
         let leaf_node = self
             .entity_mapping
             .get(entity_id)
-            .and_then(|leaf_x_coord| self.tree.get_leaf_node(*leaf_x_coord))
+            .and_then(|leaf_x_coord| self.binary_tree.get_leaf_node(*leaf_x_coord))
             .ok_or(NdmSmtError::EntityIdNotFound)?;
 
         let path_siblings = PathSiblings::build_using_multi_threaded_algorithm(
-            &self.tree,
+            &self.binary_tree,
             &leaf_node,
             new_padding_node_content,
         )?;
@@ -249,7 +259,7 @@ impl NdmSmt {
 
     /// Return the hash digest/bytes of the root node for the binary tree.
     pub fn root_hash(&self) -> H256 {
-        self.tree.root().content.hash
+        self.binary_tree.root().content.hash
     }
 
     /// Return the entity mapping, the x-coord that each entity is mapped to.
@@ -259,7 +269,7 @@ impl NdmSmt {
 
     /// Return the height of the binary tree.
     pub fn height(&self) -> &Height {
-        self.tree.height()
+        self.binary_tree.height()
     }
 }
 
