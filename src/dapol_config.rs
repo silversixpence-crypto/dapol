@@ -1,10 +1,8 @@
 use derive_builder::Builder;
 use log::{debug, info};
 use serde::Deserialize;
-use std::path::PathBuf;
 use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
-use crate::{secret, salt};
 use crate::{
     accumulators::AccumulatorType,
     entity::{self, EntitiesParser},
@@ -12,6 +10,7 @@ use crate::{
     DapolTree, DapolTreeError, Height, MaxThreadCount, Salt, Secret,
     DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
 };
+use crate::{salt, secret};
 
 /// Configuration needed to construct a [crate][DapolTree].
 ///
@@ -84,7 +83,7 @@ use crate::{
 /// let config = DapolConfigBuilder::default()
 ///     .height(height)
 ///     .secrets_file_path(PathBuf::from("./examples/ndm_smt_secrets_example.toml"))
-///     .entities_path(PathBuf::from("./examples/entities_example.csv"))
+///     .entities_file_path(PathBuf::from("./examples/entities_example.csv"))
 ///     .build();
 /// ```
 // STENT TODO will have 3 ways to build the tree: config builder, config file, just directly pass the values to the new function for dapoltree
@@ -93,7 +92,6 @@ use crate::{
 #[builder(build_fn(skip))]
 pub struct DapolConfig {
     accumulator_type: AccumulatorType,
-    master_secret: String,
     salt_b: String,
     salt_s: String,
     max_liability: u64,
@@ -101,6 +99,15 @@ pub struct DapolConfig {
     max_thread_count: MaxThreadCount,
     #[builder(private)]
     entities: EntityConfig,
+    // STENT TODO in docs & examples we'll have to make this look like entities
+    #[builder(private)]
+    secrets: SecretsConfig,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct SecretsConfig {
+    master_secret: Option<String>,
+    file_path: Option<PathBuf>,
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
@@ -117,7 +124,7 @@ impl DapolConfigBuilder {
     ///
     /// Wrapped in an option to provide ease of use if the PathBuf is already
     /// an option.
-    pub fn entities_path_opt(&mut self, path: Option<PathBuf>) -> &mut Self {
+    pub fn entities_file_path_opt(&mut self, path: Option<PathBuf>) -> &mut Self {
         match &mut self.entities {
             None => {
                 self.entities = Some(EntityConfig {
@@ -131,8 +138,8 @@ impl DapolConfigBuilder {
     }
 
     /// Set the path for the file containing the entity data.
-    pub fn entities_path(&mut self, path: PathBuf) -> &mut Self {
-        self.entities_path_opt(Some(path))
+    pub fn entities_file_path(&mut self, path: PathBuf) -> &mut Self {
+        self.entities_file_path_opt(Some(path))
     }
 
     /// Set the number of entities that will be generated randomly.
@@ -163,20 +170,49 @@ impl DapolConfigBuilder {
         self.num_random_entities_opt(Some(num_entities))
     }
 
+    /// Set the path for the file containing the secrets.
+    ///
+    /// Wrapped in an option to provide ease of use if the PathBuf is already
+    /// an option.
+    pub fn secrets_path_opt(&mut self, path: Option<PathBuf>) -> &mut Self {
+        match &mut self.secrets {
+            None => {
+                self.secrets = Some(SecretsConfig {
+                    file_path: path,
+                    master_secret: None,
+                })
+            }
+            Some(secrets) => secrets.file_path = path,
+        }
+        self
+    }
+
+    /// Set the path for the file containing the secrets.
+    pub fn secrets_path(&mut self, path: PathBuf) -> &mut Self {
+        self.secrets_path_opt(Some(path))
+    }
+
+    /// Set the master secret value directly.
+    pub fn master_secret(&mut self, master_secret: String) -> &mut Self {
+        self.secrets = Some(SecretsConfig {
+            file_path: None,
+            master_secret: Some(master_secret),
+        });
+        self
+    }
+
     /// Build the config struct.
     pub fn build(&self) -> Result<DapolConfig, DapolConfigBuilderError> {
         let accumulator_type =
             self.accumulator_type
+                .clone()
                 .ok_or(DapolConfigBuilderError::UninitializedField(
                     "accumulator_type",
                 ))?;
 
-        let master_secret = self
-            .master_secret
-            .ok_or(DapolConfigBuilderError::UninitializedField("master_secret"))?;
-
         let max_liability = self
             .max_liability
+            .clone()
             .unwrap_or(2u64.pow(DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH as u32));
 
         let entities = EntityConfig {
@@ -188,20 +224,25 @@ impl DapolConfigBuilder {
                 .or(None),
         };
 
-        let salt_b = self.salt_b.unwrap_or_default();
-        let salt_s = self.salt_s.unwrap_or_default();
+        let secrets = SecretsConfig {
+            file_path: self.secrets.clone().and_then(|e| e.file_path).or(None),
+            master_secret: self.secrets.clone().and_then(|e| e.master_secret).or(None),
+        };
+
+        let salt_b = self.salt_b.clone().unwrap_or_default();
+        let salt_s = self.salt_s.clone().unwrap_or_default();
         let height = self.height.unwrap_or_default();
         let max_thread_count = self.max_thread_count.unwrap_or_default();
 
         Ok(DapolConfig {
             accumulator_type,
-            master_secret,
             salt_b,
             salt_s,
             max_liability,
             height,
             max_thread_count,
             entities,
+            secrets,
         })
     }
 }
@@ -256,7 +297,6 @@ impl DapolConfig {
     pub fn parse(self) -> Result<DapolTree, DapolConfigError> {
         debug!("Parsing config to create a new DAPOL tree: {:?}", self);
 
-        let master_secret = Secret::from_str(&self.master_secret)?;
         let salt_b = Salt::from_str(&self.salt_b)?;
         let salt_s = Salt::from_str(&self.salt_s)?;
 
@@ -264,6 +304,16 @@ impl DapolConfig {
             .with_path_opt(self.entities.file_path)
             .with_num_entities_opt(self.entities.num_random_entities)
             .parse_file_or_generate_random()?;
+
+        let master_secret = if let Some(master_secret_str) = self.secrets.master_secret {
+            Ok(master_secret_str)
+        } else if let Some(path) = self.secrets.file_path {
+            Ok(DapolConfig::parse_secrets_file(path)?)
+        } else {
+            Err(DapolConfigError::CannotFindMasterSecret)
+        }?;
+
+        let master_secret = Secret::from_str(&master_secret)?;
 
         let dapol_tree = DapolTree::new(
             self.accumulator_type,
@@ -273,7 +323,7 @@ impl DapolConfig {
             self.max_liability,
             self.max_thread_count,
             self.height,
-            self.entities,
+            entities,
         )
         .log_on_err()?;
 
@@ -285,6 +335,37 @@ impl DapolConfig {
 
         Ok(dapol_tree)
     }
+
+    /// Open and parse the secrets file, returning a [crate][Secret].
+    ///
+    /// An error is returned if:
+    /// 1. The path is None (i.e. was not set).
+    /// 2. The file cannot be opened.
+    /// 3. The file cannot be read.
+    /// 4. The file type is not supported.
+    fn parse_secrets_file(path: PathBuf) -> Result<String, SecretsParserError> {
+        debug!(
+            "Attempting to parse {:?} as a file containing secrets",
+            path
+        );
+
+        let ext = path.extension().and_then(|s| s.to_str()).ok_or(
+            SecretsParserError::UnknownFileType(path.clone().into_os_string()),
+        )?;
+
+        let master_secret = match FileType::from_str(ext)? {
+            FileType::Toml => {
+                let mut buf = String::new();
+                File::open(path)?.read_to_string(&mut buf)?;
+                let secrets: DapolSecrets = toml::from_str(&buf)?;
+                secrets.master_secret
+            }
+        };
+
+        debug!("Successfully parsed DAPOL secrets file",);
+
+        Ok(master_secret)
+    }
 }
 
 /// Supported file types for deserialization.
@@ -293,14 +374,19 @@ enum FileType {
 }
 
 impl FromStr for FileType {
-    type Err = DapolConfigError;
+    type Err = SecretsParserError;
 
     fn from_str(ext: &str) -> Result<FileType, Self::Err> {
         match ext {
             "toml" => Ok(FileType::Toml),
-            _ => Err(DapolConfigError::UnsupportedFileType { ext: ext.into() }),
+            _ => Err(SecretsParserError::UnsupportedFileType { ext: ext.into() }),
         }
     }
+}
+
+#[derive(Deserialize, Debug)]
+struct DapolSecrets {
+    master_secret: String,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -313,10 +399,26 @@ pub enum DapolConfigError {
     EntitiesError(#[from] entity::EntitiesParserError),
     #[error("Error parsing the master secret string")]
     MasterSecretParseError(#[from] secret::SecretParserError),
+    #[error("Error parsing the master secret file")]
+    MasterSecretFileParseError(#[from] SecretsParserError),
+    #[error("Either master secret must be set directly, or a path to a file containing it must be given")]
+    CannotFindMasterSecret,
     #[error("Error parsing the salt string")]
     SaltParseError(#[from] salt::SaltParserError),
-    #[error("Tree construction failed after parsing NDM-SMT config")]
+    #[error("Tree construction failed after parsing DAPOL config")]
     BuildError(#[from] DapolTreeError),
+    #[error("Unable to find file extension for path {0:?}")]
+    UnknownFileType(OsString),
+    #[error("The file type with extension {ext:?} is not supported")]
+    UnsupportedFileType { ext: String },
+    #[error("Error reading the file")]
+    FileReadError(#[from] std::io::Error),
+    #[error("Deserialization process failed")]
+    DeserializationError(#[from] toml::de::Error),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum SecretsParserError {
     #[error("Unable to find file extension for path {0:?}")]
     UnknownFileType(OsString),
     #[error("The file type with extension {ext:?} is not supported")]
@@ -357,7 +459,7 @@ mod tests {
         let ndm_smt = DapolConfigBuilder::default()
             .height(height)
             .secrets_file_path(secrets_file_path)
-            .entities_path(entities_file_path)
+            .entities_file_path(entities_file_path)
             .build()
             .parse()
             .unwrap();
@@ -436,7 +538,7 @@ mod tests {
         let ndm_smt = DapolConfigBuilder::default()
             .height(height)
             .secrets_file_path(secrets_file_path)
-            .entities_path(entities_file_path)
+            .entities_file_path(entities_file_path)
             .num_random_entities(num_random_entities)
             .build()
             .parse()
@@ -455,5 +557,50 @@ mod tests {
             .build()
             .parse()
             .unwrap();
+    }
+}
+
+// STENT TODO grabbed these from ndm_smt_secrets_parser
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils::test_utils::assert_err;
+    use crate::Secret;
+    use std::path::Path;
+
+    #[test]
+    fn parser_toml_file_happy_case() {
+        let src_dir = env!("CARGO_MANIFEST_DIR");
+        let resources_dir = Path::new(&src_dir).join("examples");
+        let path = resources_dir.join("ndm_smt_secrets_example.toml");
+
+        let secrets = NdmSmtSecretsParser::from(path).parse().unwrap();
+
+        assert_eq!(
+            secrets.master_secret,
+            Secret::from_str("master_secret").unwrap()
+        );
+        assert_eq!(secrets.salt_b, Secret::from_str("salt_b").unwrap());
+        assert_eq!(secrets.salt_s, Secret::from_str("salt_s").unwrap());
+    }
+
+    #[test]
+    fn unsupported_file_type() {
+        let this_file = std::file!();
+        let path = PathBuf::from(this_file);
+
+        assert_err!(
+            NdmSmtSecretsParser::from(path).parse(),
+            Err(NdmSmtSecretsParserError::UnsupportedFileType { ext: _ })
+        );
+    }
+
+    #[test]
+    fn unknown_file_type() {
+        let path = PathBuf::from("./");
+        assert_err!(
+            NdmSmtSecretsParser::from(path).parse(),
+            Err(NdmSmtSecretsParserError::UnknownFileType(_))
+        );
     }
 }
