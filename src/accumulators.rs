@@ -20,6 +20,7 @@ mod config;
 pub use config::{AccumulatorConfig, AccumulatorConfigError, AccumulatorParserError};
 
 mod ndm_smt;
+use displaydoc::Display;
 pub use ndm_smt::{
     NdmSmt, NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtConfigParserError, NdmSmtError, NdmSmtSecrets,
     NdmSmtSecretsParser, RandomXCoordGenerator,
@@ -42,10 +43,16 @@ impl Accumulator {
             Accumulator::NdmSmt(ndm_smt) => ndm_smt.height()
         }
     }
+
+    pub fn get_type(&self) -> AccumulatorType {
+        match self {
+            Self::NdmSmt(_) => AccumulatorType::NdmSmt,
+        }
+    }
 }
 
 /// Various supported accumulator types.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Display)]
 #[serde(rename_all = "kebab-case")]
 pub enum AccumulatorType {
     NdmSmt,

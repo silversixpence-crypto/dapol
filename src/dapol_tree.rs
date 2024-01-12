@@ -11,13 +11,13 @@ use crate::{
 
 // STENT TODO should we change the extension to 'dapol'?
 const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
-// STENT TODO we should change this 'cause it's from the old accumulator code, but not sure to what, maybe 'proof_of_liabilities_merkle_sum_tree'
+// STENT TODO we should change this 'cause it's from the old accumulator code,
+// but not sure to what, maybe 'proof_of_liabilities_merkle_sum_tree'
 const SERIALIZED_TREE_FILE_PREFIX: &str = "accumulator_";
 
 /// Proof of Liabilities Sparse Merkle Sum Tree.
 ///
 /// This is the top-most module in the hierarchy of the [dapol] crate.
-///
 // STENT TODO this doc stuff needs to change
 /// Trees can be constructed via the configuration parsers:
 /// - [AccumulatorConfig] is used to deserialize config from a file (the
@@ -26,7 +26,6 @@ const SERIALIZED_TREE_FILE_PREFIX: &str = "accumulator_";
 /// - [NdmSmtConfigBuilder] is used to construct the
 /// config for the NDM-SMT accumulator type using a builder pattern. The config
 /// can then be parsed to construct an NDM-SMT.
-///
 // STENT TODO give example usage
 #[derive(Serialize, Deserialize)]
 pub struct DapolTree {
@@ -41,6 +40,32 @@ pub struct DapolTree {
 // Construction & proof generation.
 
 impl DapolTree {
+    /// Construct a new tree.
+    ///
+    /// An error is returned if the underlying accumulator type construction
+    /// fails.
+    ///
+    /// - `accumulator_type`: Accumulator type of the tree. This value must be
+    ///   set.
+    /// - `master_secret`: This value is known only to the tree generator, and
+    ///   is used to determine all other secret values needed in the tree. This
+    ///   value must be set.
+    /// - `salt_b`: This is a public value that is used to aid the KDF when
+    ///   generating secret blinding factors for the Pedersen commitments. If it
+    ///   is not set then it will be randomly generated.
+    /// - `salt_s`: This is a public value that is used to aid the KDF when
+    ///   generating secret salt values, which are in turn used in the hash
+    ///   function when generating node hashes. If it is not set then it will be
+    ///   randomly generated.
+    /// - `height`: Height of the tree. If not set the default height will be
+    ///   used.
+    /// - `max_thread_count`: Max number of threads to be spawned for
+    ///   multi-threading algorithms. If not set the max parallelism of the
+    ///   underlying machine will be used.
+    /// - `secrets_file_path`: Path to the secrets file. If not present the
+    ///   secrets will be generated randomly.
+    /// - `entities`: vector of [crate][Entity]
+    // STENT TODO give example
     pub fn new(
         accumulator_type: AccumulatorType,
         master_secret: Secret,
@@ -126,9 +151,9 @@ impl DapolTree {
 // Accessor methods.
 
 impl DapolTree {
-    /// Return the height of the tree.
-    pub fn height(&self) -> &Height {
-        self.accumulator.height()
+    /// Type of accumulator used.
+    pub fn accumulator_type(&self) -> AccumulatorType {
+        self.accumulator.get_type()
     }
 
     /// Tree generator's singular secret value.
@@ -139,21 +164,21 @@ impl DapolTree {
         &self.master_secret
     }
 
-    /// Return the hash function salt value.
-    ///
-    /// This is a public value that is used to aid the KDF when generating secret
-    /// salt values, which are in turn used in the hash function when generating
-    /// node hashes.
-    pub fn salt_s(&self) -> &Salt {
-        &self.salt_s
-    }
-
     /// Return the Pedersen commitment blinding factor salt value.
     ///
-    /// This is a public value that is used to aid the KDF when generating secret
-    /// blinding factors for the Pedersen commitments
+    /// This is a public value that is used to aid the KDF when generating
+    /// secret blinding factors for the Pedersen commitments
     pub fn salt_b(&self) -> &Salt {
         &self.salt_b
+    }
+
+    /// Return the hash function salt value.
+    ///
+    /// This is a public value that is used to aid the KDF when generating
+    /// secret salt values, which are in turn used in the hash function when
+    /// generating node hashes.
+    pub fn salt_s(&self) -> &Salt {
+        &self.salt_s
     }
 
     /// Return the maximum singular liability.
@@ -163,6 +188,11 @@ impl DapolTree {
     /// $[0, 2^{\text{height}} \times \text{max_liability}]$
     pub fn max_liability(&self) -> u64 {
         self.max_liability
+    }
+
+    /// Return the height of the tree.
+    pub fn height(&self) -> &Height {
+        self.accumulator.height()
     }
 }
 

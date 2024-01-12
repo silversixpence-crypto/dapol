@@ -1,29 +1,42 @@
 # Accumulator type of the tree.
-# This value determines what other values are required.
+# This value must be set.
 accumulator_type = "ndm-smt"
 
+# This value is known only to the tree generator, and is used to
+# determine all other secret values needed in the tree.
+# This value must be set.
+master_secret = "master_secret"
+
+# This is a public value that is used to aid the KDF when generating secret
+# blinding factors for the Pedersen commitments.
+# If it is not set then it will be randomly generated.
+salt_b = "salt_b"
+
+# This is a public value that is used to aid the KDF when generating secret
+# salt values, which are in turn used in the hash function when generating
+# node hashes.
+# If it is not set then it will be randomly generated.
+salt_s = "salt_s"
+
 # Height of the tree.
-# If the height is not set the default height will be used.
+# If not set the default height will be used.
 height = 16
 
 # Max number of threads to be spawned for multi-threading algorithms.
-# If the height is not set a default value will be used.
+# If not set the max parallelism of the underlying machine will be used.
 max_thread_count = 4
-
-# Path to the secrets file.
-# If not present the secrets will be generated randomly.
-secrets_file_path = "./examples/ndm_smt_secrets_example.toml"
 
 # Can be a file or directory (default file name given in this case)
 # If not present then no serialization is done.
 serialization_path = "./tree.dapoltree"
 
 # At least one of file_path & generate_random must be present.
-# If both are given then file_path is prioritized.
+# If both are given then file_path is preferred and generate_random is ignored.
 [entities]
 
 # Path to a file containing a list of entity IDs and their liabilities.
 file_path = "./examples/entities_example.csv"
 
 # Generate the given number of entities, with random IDs & liabilities.
+# This is useful for testing.
 generate_random = 4

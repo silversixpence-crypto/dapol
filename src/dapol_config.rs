@@ -27,6 +27,22 @@ use crate::{
 /// # This value must be set.
 /// accumulator_type = "ndm-smt"
 ///
+/// # This value is known only to the tree generator, and is used to
+/// # determine all other secret values needed in the tree.
+/// # This value must be set.
+/// master_secret = "master_secret"
+///
+/// # This is a public value that is used to aid the KDF when generating secret
+/// # blinding factors for the Pedersen commitments.
+/// # If it is not set then it will be randomly generated.
+/// salt_b = "salt_b"
+///
+/// # This is a public value that is used to aid the KDF when generating secret
+/// # salt values, which are in turn used in the hash function when generating
+/// # node hashes.
+/// # If it is not set then it will be randomly generated.
+/// salt_s = "salt_s"
+///
 /// # Height of the tree.
 /// # If not set the default height will be used.
 /// height = 32
@@ -224,7 +240,7 @@ pub enum DapolConfigError {
     #[error("Entities parsing failed while trying to parse NDM-SMT config")]
     EntitiesError(#[from] entity::EntitiesParserError),
     #[error("Tree construction failed after parsing NDM-SMT config")]
-    BuildError(#[from] super::DapolTreeError),
+    BuildError(#[from] DapolTreeError),
 }
 
 // -------------------------------------------------------------------------------------------------
