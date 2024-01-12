@@ -196,6 +196,9 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
     let mut group = c.benchmark_group("proofs");
 
+    dapol::initialize_machine_parallelism();
+    dapol::utils::activate_logging(*LOG_VERBOSITY);
+
     for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
         for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
             {
@@ -295,6 +298,9 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 /// verification does not depend on number of threads.
 pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
     let mut group = c.benchmark_group("proofs");
+
+    dapol::initialize_machine_parallelism();
+    dapol::utils::activate_logging(*LOG_VERBOSITY);
 
     for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
         for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
