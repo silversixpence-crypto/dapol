@@ -16,7 +16,7 @@ use crate::inclusion_proof::{
     AggregationFactor, InclusionProof, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
 };
 use crate::kdf::generate_key;
-use crate::node_content::FullNodeContent;
+use crate::binary_tree::FullNodeContent;
 use crate::MaxThreadCount;
 
 mod ndm_smt_secrets;

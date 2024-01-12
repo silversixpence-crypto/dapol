@@ -6,7 +6,7 @@ use std::{fmt::Debug, path::PathBuf};
 use log::info;
 
 use crate::binary_tree::{Coordinate, Height, Node, PathSiblings};
-use crate::node_content::{FullNodeContent, HiddenNodeContent};
+use crate::binary_tree::{FullNodeContent, HiddenNodeContent};
 use crate::{read_write_utils, EntityId};
 
 mod individual_range_proof;

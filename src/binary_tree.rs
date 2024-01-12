@@ -35,6 +35,11 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+mod utils;
+
+mod node_content;
+pub use node_content::{FullNodeContent, HiddenNodeContent, Mergeable};
+
 mod tree_builder;
 pub use tree_builder::multi_threaded;
 pub use tree_builder::{
@@ -43,8 +48,6 @@ pub use tree_builder::{
 
 mod path_siblings;
 pub use path_siblings::{PathSiblings, PathSiblingsBuildError, PathSiblingsError};
-
-mod utils;
 
 mod height;
 pub use height::{Height, HeightError, MAX_HEIGHT, MIN_HEIGHT};
@@ -118,12 +121,6 @@ pub struct Coordinate {
 pub enum Store<C> {
     MultiThreadedStore(multi_threaded::DashMapStore<C>),
     SingleThreadedStore(single_threaded::HashMapStore<C>),
-}
-
-/// The generic content type of a [Node] must implement this trait to allow 2
-/// sibling nodes to be combined to make a new parent node.
-pub trait Mergeable {
-    fn merge(left_sibling: &Self, right_sibling: &Self) -> Self;
 }
 
 // -------------------------------------------------------------------------------------------------
