@@ -29,11 +29,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::Height;
 
-/// Various supported accumulator types.
+/// Supported accumulators, with their linked data.
 #[derive(Serialize, Deserialize)]
 pub enum Accumulator {
     NdmSmt(ndm_smt::NdmSmt),
-    // TODO other accumulators..
+    // TODO add other accumulators..
 }
 
 impl Accumulator {
@@ -44,3 +44,10 @@ impl Accumulator {
     }
 }
 
+/// Various supported accumulator types.
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum AccumulatorType {
+    NdmSmt,
+    // TODO add other accumulators..
+}

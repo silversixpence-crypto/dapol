@@ -161,10 +161,11 @@
 //! ```
 
 mod kdf;
+mod accumulators;
+mod read_write_utils;
 
 pub mod cli;
 pub mod percentage;
-pub mod read_write_utils;
 pub mod utils;
 
 mod dapol_tree;
@@ -180,9 +181,6 @@ pub use hasher::Hasher;
 
 mod max_thread_count;
 pub use max_thread_count::{initialize_machine_parallelism, MaxThreadCount, MACHINE_PARALLELISM};
-
-pub mod accumulators;
-pub use accumulators::{Accumulator, AccumulatorConfig, AccumulatorConfigError, AccumulatorError};
 
 mod binary_tree;
 pub use binary_tree::{Height, HeightError, MAX_HEIGHT, MIN_HEIGHT};

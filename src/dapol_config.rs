@@ -5,7 +5,7 @@ use log::{debug, info};
 use serde::Deserialize;
 
 use crate::{
-    accumulators,
+    accumulators::AccumulatorType,
     entity::{self, EntitiesParser},
     utils::LogOnErr,
     DapolTree, DapolTreeError, Height, MaxThreadCount, Salt, Secret,
@@ -75,7 +75,7 @@ use crate::{
 #[serde(rename_all = "kebab-case")]
 #[builder(build_fn(skip))]
 pub struct DapolConfig {
-    accumulator_type: String,
+    accumulator_type: AccumulatorType,
     master_secret: Secret,
     salt_b: Salt,
     salt_s: Salt,

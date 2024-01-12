@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::{
-    accumulators::{Accumulator, NdmSmtError},
+    accumulators::{Accumulator, NdmSmtError, AccumulatorType, self, NdmSmt},
     read_write_utils::{self, ReadWriteError},
     utils::LogOnErr,
     AggregationFactor, Entity, Height, InclusionProof, Salt, Secret, MaxThreadCount,
@@ -42,7 +42,7 @@ pub struct DapolTree {
 
 impl DapolTree {
     pub fn new(
-        accumulator_type: String,
+        accumulator_type: AccumulatorType,
         master_secret: Secret,
         salt_s: Salt,
         salt_b: Salt,
@@ -51,6 +51,12 @@ impl DapolTree {
         height: Height,
         entities: Vec<Entity>
     ) -> Result<Self, DapolTreeError> {
+        let accumulator = match accumulator_type {
+            AccumulatorType::NdmSmt => {
+                NdmSmt::new(secrets, height, max_thread_count, entities)
+            }
+        };
+
         DapolTree {
             accumulator,
             master_secret,
