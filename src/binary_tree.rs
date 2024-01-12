@@ -43,7 +43,7 @@ pub use node_content::{FullNodeContent, HiddenNodeContent, Mergeable};
 mod tree_builder;
 pub use tree_builder::multi_threaded;
 pub use tree_builder::{
-    single_threaded, InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH,
+    single_threaded, InputLeafNode, TreeBuildError, BinaryTreeBuilder, MIN_STORE_DEPTH,
 };
 
 mod path_siblings;

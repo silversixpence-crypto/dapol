@@ -47,7 +47,7 @@ pub const MIN_STORE_DEPTH: u8 = 1;
 ///
 /// [binary tree]: super::BinaryTree
 #[derive(Debug)]
-pub struct TreeBuilder<C> {
+pub struct BinaryTreeBuilder<C> {
     height: Option<Height>,
     leaf_nodes: Option<Vec<InputLeafNode<C>>>,
     store_depth: Option<u8>,
@@ -67,13 +67,13 @@ pub struct InputLeafNode<C> {
 // -------------------------------------------------------------------------------------------------
 // Implementations.
 
-impl<C> TreeBuilder<C>
+impl<C> BinaryTreeBuilder<C>
 where
     C: Clone + Mergeable + 'static, /* The static is needed when the single threaded builder
                                      * builds the boxed hashmap. */
 {
     pub fn new() -> Self {
-        TreeBuilder {
+        BinaryTreeBuilder {
             height: None,
             leaf_nodes: None,
             store_depth: None,
@@ -334,13 +334,13 @@ mod tests {
 
         let leaf_nodes = sparse_leaves(&height);
 
-        let single_threaded = TreeBuilder::new()
+        let single_threaded = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
-        let multi_threaded = TreeBuilder::new()
+        let multi_threaded = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_multi_threaded_algorithm(generate_padding_closure())
@@ -357,13 +357,13 @@ mod tests {
 
         let leaf_nodes = full_bottom_layer(&height);
 
-        let single_threaded = TreeBuilder::new()
+        let single_threaded = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
-        let multi_threaded = TreeBuilder::new()
+        let multi_threaded = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_multi_threaded_algorithm(generate_padding_closure())
@@ -381,13 +381,13 @@ mod tests {
         for i in 0..height.max_bottom_layer_nodes() {
             let leaf_node = vec![single_leaf(i)];
 
-            let single_threaded = TreeBuilder::new()
+            let single_threaded = BinaryTreeBuilder::new()
                 .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
                 .build_using_single_threaded_algorithm(generate_padding_closure())
                 .unwrap();
 
-            let multi_threaded = TreeBuilder::new()
+            let multi_threaded = BinaryTreeBuilder::new()
                 .with_height(height)
                 .with_leaf_nodes(leaf_node)
                 .build_using_multi_threaded_algorithm(generate_padding_closure())
@@ -405,7 +405,7 @@ mod tests {
     fn err_when_parent_builder_height_not_set() {
         let height = Height::expect_from(4);
         let leaf_nodes = full_bottom_layer(&height);
-        let res = TreeBuilder::new().with_leaf_nodes(leaf_nodes).height();
+        let res = BinaryTreeBuilder::new().with_leaf_nodes(leaf_nodes).height();
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoHeightProvided));
@@ -414,7 +414,7 @@ mod tests {
     #[test]
     fn err_when_parent_builder_leaf_nodes_not_set() {
         let height = Height::expect_from(4);
-        let res = TreeBuilder::<TestContent>::new()
+        let res = BinaryTreeBuilder::<TestContent>::new()
             .with_height(height)
             .leaf_nodes(&height);
 
@@ -425,7 +425,7 @@ mod tests {
     #[test]
     fn err_for_empty_leaves() {
         let height = Height::expect_from(5);
-        let res = TreeBuilder::<TestContent>::new()
+        let res = BinaryTreeBuilder::<TestContent>::new()
             .with_height(height)
             .with_leaf_nodes(Vec::new())
             .leaf_nodes(&height);
@@ -446,7 +446,7 @@ mod tests {
             },
         });
 
-        let res = TreeBuilder::new()
+        let res = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .leaf_nodes(&height);

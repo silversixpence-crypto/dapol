@@ -9,7 +9,7 @@ use logging_timer::{timer, Level};
 use rayon::prelude::*;
 
 use crate::binary_tree::{
-    BinaryTree, Coordinate, Height, InputLeafNode, PathSiblings, TreeBuilder,
+    BinaryTree, Coordinate, Height, InputLeafNode, PathSiblings, BinaryTreeBuilder,
 };
 use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{
@@ -162,7 +162,7 @@ impl NdmSmt {
             entity_mapping.insert(entity.id, x_coord);
         }
 
-        let tree = TreeBuilder::new()
+        let tree = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_max_thread_count(max_thread_count)

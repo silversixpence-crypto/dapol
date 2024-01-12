@@ -328,7 +328,7 @@ mod tests {
     fn err_when_parent_builder_height_not_set() {
         let height = Height::expect_from(4);
         let leaf_nodes = full_bottom_layer(&height);
-        let res = TreeBuilder::new()
+        let res = BinaryTreeBuilder::new()
             .with_leaf_nodes(leaf_nodes)
             .build_using_single_threaded_algorithm(generate_padding_closure());
 
@@ -339,7 +339,7 @@ mod tests {
     #[test]
     fn err_when_parent_builder_leaf_nodes_not_set() {
         let height = Height::expect_from(4);
-        let res = TreeBuilder::new()
+        let res = BinaryTreeBuilder::new()
             .with_height(height)
             .build_using_single_threaded_algorithm(generate_padding_closure());
 
@@ -350,7 +350,7 @@ mod tests {
     #[test]
     fn err_for_empty_leaves() {
         let height = Height::expect_from(5);
-        let res = TreeBuilder::<TestContent>::new()
+        let res = BinaryTreeBuilder::<TestContent>::new()
             .with_height(height)
             .with_leaf_nodes(Vec::<InputLeafNode<TestContent>>::new())
             .build_using_single_threaded_algorithm(generate_padding_closure());
@@ -372,7 +372,7 @@ mod tests {
             },
         });
 
-        let res = TreeBuilder::new()
+        let res = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_single_threaded_algorithm(generate_padding_closure());
@@ -392,7 +392,7 @@ mod tests {
         let mut leaf_nodes = sparse_leaves(&height);
         leaf_nodes.push(single_leaf(leaf_nodes.get(0).unwrap().x_coord));
 
-        let res = TreeBuilder::new()
+        let res = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_single_threaded_algorithm(generate_padding_closure());
@@ -406,7 +406,7 @@ mod tests {
         let height = Height::expect_from(4);
         let leaf_node = single_leaf(height.max_bottom_layer_nodes() + 1);
 
-        let res = TreeBuilder::new()
+        let res = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(vec![leaf_node])
             .build_using_single_threaded_algorithm(generate_padding_closure());
@@ -424,7 +424,7 @@ mod tests {
         let height = Height::expect_from(4);
         let mut leaf_nodes = sparse_leaves(&height);
 
-        let tree = TreeBuilder::new()
+        let tree = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(&generate_padding_closure())
@@ -433,7 +433,7 @@ mod tests {
 
         leaf_nodes.shuffle(&mut thread_rng());
 
-        let tree = TreeBuilder::new()
+        let tree = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_single_threaded_algorithm(&generate_padding_closure())
@@ -447,7 +447,7 @@ mod tests {
         let height = Height::expect_from(5);
         let leaf_nodes = sparse_leaves(&height);
 
-        let tree = TreeBuilder::new()
+        let tree = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(&generate_padding_closure())
@@ -468,7 +468,7 @@ mod tests {
         let height = Height::expect_from(8);
         let leaf_nodes = full_bottom_layer(&height);
 
-        let tree = TreeBuilder::new()
+        let tree = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(&generate_padding_closure())
@@ -506,7 +506,7 @@ mod tests {
         // TODO fuzz on this store depth
         let store_depth = 1;
 
-        let tree = TreeBuilder::new()
+        let tree = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(store_depth)
