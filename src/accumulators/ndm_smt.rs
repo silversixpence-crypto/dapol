@@ -17,7 +17,7 @@ use crate::inclusion_proof::{
     AggregationFactor, InclusionProof, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
 };
 use crate::kdf::generate_key;
-use crate::MaxThreadCount;
+use crate::{MaxThreadCount, Salt, Secret};
 
 mod ndm_smt_secrets;
 pub use ndm_smt_secrets::NdmSmtSecrets;
@@ -55,8 +55,6 @@ type Content = FullNodeContent;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NdmSmt {
-    // STENT TODO remove secrets here
-    secrets: NdmSmtSecrets,
     binary_tree: BinaryTree<Content>,
     entity_mapping: HashMap<EntityId, u64>,
 }
@@ -81,14 +79,16 @@ impl NdmSmt {
     ///
     /// [input leaf node]: crate::binary_tree::InputLeafNode
     pub fn new(
-        secrets: NdmSmtSecrets,
+        master_secret: Secret,
+        salt_b: Salt,
+        salt_s: Salt,
         height: Height,
         max_thread_count: MaxThreadCount,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
-        let master_secret_bytes = secrets.master_secret.as_bytes();
-        let salt_b_bytes = secrets.salt_b.as_bytes();
-        let salt_s_bytes = secrets.salt_s.as_bytes();
+        let master_secret_bytes = master_secret.as_bytes();
+        let salt_b_bytes = salt_b.as_bytes();
+        let salt_s_bytes = salt_s.as_bytes();
 
         info!(
             "\nCreating NDM-SMT with the following configuration:\n \
@@ -184,7 +184,6 @@ impl NdmSmt {
 
         Ok(NdmSmt {
             binary_tree: tree,
-            secrets,
             entity_mapping,
         })
     }
@@ -210,13 +209,16 @@ impl NdmSmt {
     /// an Err.
     pub fn generate_inclusion_proof_with(
         &self,
+        master_secret: Secret,
+        salt_b: Salt,
+        salt_s: Salt,
         entity_id: &EntityId,
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
     ) -> Result<InclusionProof, NdmSmtError> {
-        let master_secret_bytes = self.secrets.master_secret.as_bytes();
-        let salt_b_bytes = self.secrets.salt_b.as_bytes();
-        let salt_s_bytes = self.secrets.salt_s.as_bytes();
+        let master_secret_bytes = master_secret.as_bytes();
+        let salt_b_bytes = salt_b.as_bytes();
+        let salt_s_bytes = salt_s.as_bytes();
         let new_padding_node_content =
             new_padding_node_content_closure(*master_secret_bytes, *salt_b_bytes, *salt_s_bytes);
 
@@ -248,9 +250,15 @@ impl NdmSmt {
     ///   real-world cases)
     pub fn generate_inclusion_proof(
         &self,
+        master_secret: Secret,
+        salt_b: Salt,
+        salt_s: Salt,
         entity_id: &EntityId,
     ) -> Result<InclusionProof, NdmSmtError> {
         self.generate_inclusion_proof_with(
+            master_secret,
+            salt_b,
+            salt_s,
             entity_id,
             AggregationFactor::default(),
             DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,

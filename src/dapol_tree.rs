@@ -3,10 +3,10 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::{
-    accumulators::{Accumulator, NdmSmtError, AccumulatorType, self, NdmSmt},
+    accumulators::{Accumulator, AccumulatorType, NdmSmt, NdmSmtError},
     read_write_utils::{self, ReadWriteError},
     utils::LogOnErr,
-    AggregationFactor, Entity, Height, InclusionProof, Salt, Secret, MaxThreadCount,
+    AggregationFactor, Entity, EntityId, Height, InclusionProof, MaxThreadCount, Salt, Secret,
 };
 
 // STENT TODO should we change the extension to 'dapol'?
@@ -38,7 +38,7 @@ pub struct DapolTree {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Construction.
+// Construction & proof generation.
 
 impl DapolTree {
     pub fn new(
@@ -49,11 +49,19 @@ impl DapolTree {
         max_liability: u64,
         max_thread_count: MaxThreadCount,
         height: Height,
-        entities: Vec<Entity>
+        entities: Vec<Entity>,
     ) -> Result<Self, DapolTreeError> {
         let accumulator = match accumulator_type {
             AccumulatorType::NdmSmt => {
-                NdmSmt::new(secrets, height, max_thread_count, entities)
+                let ndm_smt = NdmSmt::new(
+                    master_secret,
+                    salt_b,
+                    salt_s,
+                    height,
+                    max_thread_count,
+                    entities,
+                )?;
+                Accumulator::NdmSmt(ndm_smt)
             }
         };
 
@@ -63,6 +71,53 @@ impl DapolTree {
             salt_s,
             salt_b,
             max_liability,
+        }
+    }
+
+    /// Generate an inclusion proof for the given `entity_id`.
+    ///
+    /// `aggregation_factor` is used to determine how many of the range proofs
+    /// are aggregated. Those that do not form part of the aggregated proof
+    /// are just proved individually. The aggregation is a feature of the
+    /// Bulletproofs protocol that improves efficiency.
+    ///
+    /// `upper_bound_bit_length` is used to determine the upper bound for the
+    /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
+    /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
+    /// some liability. The type is set to `u8` because we are not expected
+    /// to require bounds higher than $2^256$. Note that if the value is set
+    /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
+    /// an Err.
+    pub fn generate_inclusion_proof_with(
+        &self,
+        entity_id: &EntityId,
+        aggregation_factor: AggregationFactor,
+        upper_bound_bit_length: u8,
+    ) -> Result<InclusionProof, NdmSmtError> {
+        match self.accumulator {
+            Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof_with(
+                self.master_secret,
+                self.salt_b,
+                self.salt_s,
+                entity_id,
+                aggregation_factor,
+                upper_bound_bit_length,
+            ),
+        }
+    }
+
+    /// Generate an inclusion proof for the given `entity_id`.
+    pub fn generate_inclusion_proof(
+        &self,
+        entity_id: &EntityId,
+    ) -> Result<InclusionProof, NdmSmtError> {
+        match self.accumulator {
+            Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof(
+                self.master_secret,
+                self.salt_b,
+                self.salt_s,
+                entity_id,
+            ),
         }
     }
 }
@@ -204,50 +259,6 @@ impl DapolTree {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Proof generation.
-
-impl DapolTree {
-    /// Generate an inclusion proof for the given `entity_id`.
-    ///
-    /// `aggregation_factor` is used to determine how many of the range proofs
-    /// are aggregated. Those that do not form part of the aggregated proof
-    /// are just proved individually. The aggregation is a feature of the
-    /// Bulletproofs protocol that improves efficiency.
-    ///
-    /// `upper_bound_bit_length` is used to determine the upper bound for the
-    /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
-    /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
-    /// some liability. The type is set to `u8` because we are not expected
-    /// to require bounds higher than $2^256$. Note that if the value is set
-    /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
-    /// an Err.
-    pub fn generate_inclusion_proof_with(
-        &self,
-        entity_id: &EntityId,
-        aggregation_factor: AggregationFactor,
-        upper_bound_bit_length: u8,
-    ) -> Result<InclusionProof, NdmSmtError> {
-        match self.accumulator {
-            Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof_with(
-                entity_id,
-                aggregation_factor,
-                upper_bound_bit_length,
-            ),
-        }
-    }
-
-    /// Generate an inclusion proof for the given `entity_id`.
-    pub fn generate_inclusion_proof(
-        &self,
-        entity_id: &EntityId,
-    ) -> Result<InclusionProof, NdmSmtError> {
-        match self.accumulator {
-            Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof(entity_id),
-        }
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
 // Errors.
 
 /// Errors encountered when handling an [Accumulator].
@@ -255,6 +266,8 @@ impl DapolTree {
 pub enum DapolTreeError {
     #[error("Error serializing/deserializing file")]
     SerdeError(#[from] ReadWriteError),
+    #[error("Error constructing a new NDM-SMT")]
+    NdmSmtConstructionError(#[from] NdmSmtError),
 }
 
 // -------------------------------------------------------------------------------------------------
