@@ -166,6 +166,12 @@ pub mod percentage;
 pub mod read_write_utils;
 pub mod utils;
 
+mod dapol_tree;
+pub use dapol_tree::DapolTree;
+
+mod salt;
+pub use salt::Salt;
+
 mod hasher;
 pub use hasher::Hasher;
 
