@@ -14,7 +14,7 @@ pub fn build_ndm_smt_using_builder_pattern() -> dapol::accumulators::NdmSmt {
     let config = dapol::accumulators::NdmSmtConfigBuilder::default()
         .height(height)
         .secrets_file_path(secrets_file)
-        .entities_path(entities_file)
+        .entities_file_path(entities_file)
         .build();
 
     config.parse().unwrap()

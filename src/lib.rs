@@ -101,7 +101,7 @@
 //!     let config = dapol::accumulators::NdmSmtConfigBuilder::default()
 //!         .height(height)
 //!         .secrets_file_path(secrets_file)
-//!         .entities_path(entities_file)
+//!         .entities_file_path(entities_file)
 //!         .build();
 //!
 //!     config.parse().unwrap()
@@ -160,8 +160,8 @@
 //! }
 //! ```
 
-mod kdf;
 mod accumulators;
+mod kdf;
 mod read_write_utils;
 
 pub mod cli;
@@ -172,6 +172,9 @@ mod dapol_tree;
 pub use dapol_tree::{DapolTree, DapolTreeError};
 
 mod dapol_config;
+pub use dapol_config::{
+    DapolConfig, DapolConfigBuilder, DapolConfigBuilderError, DapolConfigError,
+};
 
 mod salt;
 pub use salt::Salt;

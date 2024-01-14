@@ -19,17 +19,8 @@ use crate::inclusion_proof::{
 use crate::kdf::generate_key;
 use crate::{MaxThreadCount, Salt, Secret};
 
-mod ndm_smt_secrets;
-pub use ndm_smt_secrets::NdmSmtSecrets;
-
-mod ndm_smt_secrets_parser;
-pub use ndm_smt_secrets_parser::NdmSmtSecretsParser;
-
 mod x_coord_generator;
 pub use x_coord_generator::RandomXCoordGenerator;
-
-mod ndm_smt_config;
-pub use ndm_smt_config::{NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtConfigParserError};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.
@@ -209,9 +200,9 @@ impl NdmSmt {
     /// an Err.
     pub fn generate_inclusion_proof_with(
         &self,
-        master_secret: Secret,
-        salt_b: Salt,
-        salt_s: Salt,
+        master_secret: &Secret,
+        salt_b: &Salt,
+        salt_s: &Salt,
         entity_id: &EntityId,
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
@@ -250,9 +241,9 @@ impl NdmSmt {
     ///   real-world cases)
     pub fn generate_inclusion_proof(
         &self,
-        master_secret: Secret,
-        salt_b: Salt,
-        salt_s: Salt,
+        master_secret: &Secret,
+        salt_b: &Salt,
+        salt_s: &Salt,
         entity_id: &EntityId,
     ) -> Result<InclusionProof, NdmSmtError> {
         self.generate_inclusion_proof_with(
