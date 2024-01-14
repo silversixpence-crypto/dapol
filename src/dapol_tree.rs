@@ -1,4 +1,5 @@
 use log::{debug, info};
+use primitive_types::H256;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -79,9 +80,9 @@ impl DapolTree {
         let accumulator = match accumulator_type {
             AccumulatorType::NdmSmt => {
                 let ndm_smt = NdmSmt::new(
-                    master_secret,
-                    salt_b,
-                    salt_s,
+                    master_secret.clone(),
+                    salt_b.clone(),
+                    salt_s.clone(),
                     height,
                     max_thread_count,
                     entities,
@@ -90,13 +91,13 @@ impl DapolTree {
             }
         };
 
-        DapolTree {
+        Ok(DapolTree {
             accumulator,
             master_secret,
             salt_s,
             salt_b,
             max_liability,
-        }
+        })
     }
 
     /// Generate an inclusion proof for the given `entity_id`.
@@ -119,11 +120,11 @@ impl DapolTree {
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
     ) -> Result<InclusionProof, NdmSmtError> {
-        match self.accumulator {
+        match &self.accumulator {
             Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof_with(
-                self.master_secret,
-                self.salt_b,
-                self.salt_s,
+                &self.master_secret,
+                &self.salt_b,
+                &self.salt_s,
                 entity_id,
                 aggregation_factor,
                 upper_bound_bit_length,
@@ -136,11 +137,11 @@ impl DapolTree {
         &self,
         entity_id: &EntityId,
     ) -> Result<InclusionProof, NdmSmtError> {
-        match self.accumulator {
+        match &self.accumulator {
             Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof(
-                self.master_secret,
-                self.salt_b,
-                self.salt_s,
+                &self.master_secret,
+                &self.salt_b,
+                &self.salt_s,
                 entity_id,
             ),
         }
@@ -193,6 +194,11 @@ impl DapolTree {
     /// Return the height of the tree.
     pub fn height(&self) -> &Height {
         self.accumulator.height()
+    }
+
+    /// Return the hash digest/bytes of the root node for the binary tree.
+    pub fn root_hash(&self) -> H256 {
+        self.accumulator.root_hash()
     }
 }
 

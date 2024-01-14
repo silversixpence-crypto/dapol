@@ -92,8 +92,8 @@ use crate::{salt, secret};
 #[builder(build_fn(skip))]
 pub struct DapolConfig {
     accumulator_type: AccumulatorType,
-    salt_b: String,
-    salt_s: String,
+    salt_b: Salt,
+    salt_s: Salt,
     max_liability: u64,
     height: Height,
     max_thread_count: MaxThreadCount,
@@ -106,7 +106,7 @@ pub struct DapolConfig {
 
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct SecretsConfig {
-    master_secret: Option<String>,
+    master_secret: Option<Secret>,
     file_path: Option<PathBuf>,
 }
 
@@ -174,7 +174,7 @@ impl DapolConfigBuilder {
     ///
     /// Wrapped in an option to provide ease of use if the PathBuf is already
     /// an option.
-    pub fn secrets_path_opt(&mut self, path: Option<PathBuf>) -> &mut Self {
+    pub fn secrets_file_path_opt(&mut self, path: Option<PathBuf>) -> &mut Self {
         match &mut self.secrets {
             None => {
                 self.secrets = Some(SecretsConfig {
@@ -188,12 +188,12 @@ impl DapolConfigBuilder {
     }
 
     /// Set the path for the file containing the secrets.
-    pub fn secrets_path(&mut self, path: PathBuf) -> &mut Self {
-        self.secrets_path_opt(Some(path))
+    pub fn secrets_file_path(&mut self, path: PathBuf) -> &mut Self {
+        self.secrets_file_path_opt(Some(path))
     }
 
     /// Set the master secret value directly.
-    pub fn master_secret(&mut self, master_secret: String) -> &mut Self {
+    pub fn master_secret(&mut self, master_secret: Secret) -> &mut Self {
         self.secrets = Some(SecretsConfig {
             file_path: None,
             master_secret: Some(master_secret),
@@ -297,23 +297,21 @@ impl DapolConfig {
     pub fn parse(self) -> Result<DapolTree, DapolConfigError> {
         debug!("Parsing config to create a new DAPOL tree: {:?}", self);
 
-        let salt_b = Salt::from_str(&self.salt_b)?;
-        let salt_s = Salt::from_str(&self.salt_s)?;
+        let salt_b = self.salt_b;
+        let salt_s = self.salt_s;
 
         let entities = EntitiesParser::new()
             .with_path_opt(self.entities.file_path)
             .with_num_entities_opt(self.entities.num_random_entities)
             .parse_file_or_generate_random()?;
 
-        let master_secret = if let Some(master_secret_str) = self.secrets.master_secret {
-            Ok(master_secret_str)
+        let master_secret = if let Some(master_secret) = self.secrets.master_secret {
+            Ok(master_secret)
         } else if let Some(path) = self.secrets.file_path {
             Ok(DapolConfig::parse_secrets_file(path)?)
         } else {
             Err(DapolConfigError::CannotFindMasterSecret)
         }?;
-
-        let master_secret = Secret::from_str(&master_secret)?;
 
         let dapol_tree = DapolTree::new(
             self.accumulator_type,
@@ -343,7 +341,7 @@ impl DapolConfig {
     /// 2. The file cannot be opened.
     /// 3. The file cannot be read.
     /// 4. The file type is not supported.
-    fn parse_secrets_file(path: PathBuf) -> Result<String, SecretsParserError> {
+    fn parse_secrets_file(path: PathBuf) -> Result<Secret, SecretsParserError> {
         debug!(
             "Attempting to parse {:?} as a file containing secrets",
             path
@@ -386,7 +384,7 @@ impl FromStr for FileType {
 
 #[derive(Deserialize, Debug)]
 struct DapolSecrets {
-    master_secret: String,
+    master_secret: Secret,
 }
 
 // -------------------------------------------------------------------------------------------------

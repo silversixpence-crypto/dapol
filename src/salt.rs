@@ -3,11 +3,9 @@ use rand::{
     distributions::{Alphanumeric, DistString},
     thread_rng,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use serde_with::DeserializeFromStr;
 use std::convert::From;
-use std::str::FromStr;
-
-use crate::kdf::Key;
 
 /// The max size of the salt is 256 bits, but this is a soft limit so it
 /// can be increased if necessary. Note that the underlying array length will
@@ -30,7 +28,7 @@ const STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here b
 /// Currently there is no need for the functionality provided by something like
 /// [primitive_types][U256] or [num256][Uint256] but those are options for
 /// later need be.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, DeserializeFromStr)]
 pub struct Salt([u8; 32]);
 
 impl Salt {
@@ -47,28 +45,22 @@ impl Salt {
     }
 }
 
-impl Default for Salt {
-    fn default() -> Self {
-        Salt::generate_random()
-    }
-}
+// -------------------------------------------------------------------------------------------------
+// From for KDF key.
 
-impl From<Key> for Salt {
-    fn from(key: Key) -> Self {
+use crate::kdf;
+
+impl From<kdf::Key> for Salt {
+    fn from(key: kdf::Key) -> Self {
         let bytes: [u8; 32] = key.into();
         Salt(bytes)
     }
 }
 
-impl From<u64> for Salt {
-    /// Constructor that takes in a u64.
-    fn from(num: u64) -> Self {
-        let bytes = num.to_le_bytes();
-        let mut arr = [0u8; 32];
-        arr[..8].copy_from_slice(&bytes[..8]);
-        Salt(arr)
-    }
-}
+// -------------------------------------------------------------------------------------------------
+// From for str.
+
+use std::str::FromStr;
 
 impl FromStr for Salt {
     type Err = SaltParserError;
@@ -81,15 +73,54 @@ impl FromStr for Salt {
         } else {
             let mut arr = [0u8; 32];
             // this works because string slices are stored fundamentally as u8 arrays
+            // STENT TODO so if I give it "0x4563412" then are the underlying bytes what I expect?
+            //   we are probably going to have to support bytes & strings :/
             arr[..s.len()].copy_from_slice(s.as_bytes());
             Ok(Salt(arr))
         }
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Into for raw bytes.
+
 impl From<Salt> for [u8; 32] {
     fn from(item: Salt) -> Self {
         item.0
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// From for u64.
+
+impl From<u64> for Salt {
+    /// Constructor that takes in a u64.
+    fn from(num: u64) -> Self {
+        let bytes = num.to_le_bytes();
+        let mut arr = [0u8; 32];
+        arr[..8].copy_from_slice(&bytes[..8]);
+        Salt(arr)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// From for OsStr (for the CLI).
+
+use clap::builder::OsStr;
+
+impl From<Salt> for OsStr {
+    // https://stackoverflow.com/questions/19076719/how-do-i-convert-a-vector-of-bytes-u8-to-a-string
+    fn from(salt: Salt) -> OsStr {
+        OsStr::from(String::from_utf8_lossy(&salt.0).into_owned())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Default.
+
+impl Default for Salt {
+    fn default() -> Self {
+        Salt::generate_random()
     }
 }
 
