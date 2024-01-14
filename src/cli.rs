@@ -111,32 +111,27 @@ pub enum BuildKindCommand {
     /// supported by the configuration file format which can be found in the
     ///`build-tree config-file` command.";
     New {
-        /// Choose an accumulator type for the tree.
-        #[arg(short, long, value_enum)]
+        #[arg(short, long, value_enum, help = include_str!("./shared_docs/accumulator_type.md"))]
         accumulator_type: AccumulatorType,
 
-        /// Height to use for the binary tree.
-        #[arg(long, value_parser = Height::from_str, default_value = Height::default(), value_name = "U8_INT")]
+        // STENT TODO the salts should have the option to be set via bytes as opposed to string
+        #[arg(long, value_parser = Salt::from_str, help = include_str!("./shared_docs/salt_b.md"))]
+        salt_b: Option<Salt>,
+
+        #[arg(long, value_parser = Salt::from_str, help = include_str!("./shared_docs/salt_s.md"))]
+        salt_s: Option<Salt>,
+
+        #[arg(long, value_parser = Height::from_str, default_value = Height::default(), value_name = "U8_INT", help = include_str!("./shared_docs/height.md"))]
         height: Height,
 
-        /// Max thread count allowed for parallel tree builder.
-        #[arg(long, value_parser = MaxThreadCount::from_str, default_value = MaxThreadCount::default(), value_name = "U8_INT")]
+        #[arg(long, value_name = "U64_INT", help = include_str!("./shared_docs/max_liability.md"))]
+        max_liability: u64,
+
+        #[arg(long, value_parser = MaxThreadCount::from_str, default_value = MaxThreadCount::default(), value_name = "U8_INT", help = include_str!("./shared_docs/max_thread_count.md"))]
         max_thread_count: MaxThreadCount,
 
         #[arg(short, long, value_name = "FILE_PATH", long_help = SECRETS_HELP)]
         secrets_file: Option<InputArg>,
-
-        /// This is a public value that is used to aid the KDF when generating
-        /// secret blinding factors for the Pedersen commitments
-        // STENT TODO the salts should have the option to be set via bytes as opposed to string
-        #[arg(long, value_parser = Salt::from_str, default_value = Salt::default())]
-        salt_b: Salt,
-
-        /// This is a public value that is used to aid the KDF when generating
-        /// secret salt values, which are in turn used in the hash function when
-        /// generating node hashes.
-        #[arg(long, value_parser = Salt::from_str, default_value = Salt::default())]
-        salt_s: Salt,
 
         #[command(flatten)]
         entity_source: EntitySource,
@@ -214,52 +209,15 @@ entity_id,liability";
 const COMMAND_CONFIG_FILE_ABOUT: &str =
     "Read tree configuration from a file. Supported file formats: TOML.";
 
-const COMMAND_CONFIG_FILE_LONG_ABOUT: &str = "
+const COMMAND_CONFIG_FILE_LONG_ABOUT: &str = concat!(
+    "
 Read tree configuration from a file.
 Supported file formats: TOML.
 
 Config file format (TOML):
 ```
-# Accumulator type of the tree.
-# This value must be set.
-accumulator_type = \"ndm-smt\"
-
-# This value is known only to the tree generator, and is used to
-# determine all other secret values needed in the tree.
-# This value must be set.
-master_secret = \"master_secret\"
-
-# This is a public value that is used to aid the KDF when generating secret
-# blinding factors for the Pedersen commitments.
-# If it is not set then it will be randomly generated.
-salt_b = \"salt_b\"
-
-# This is a public value that is used to aid the KDF when generating secret
-# salt values, which are in turn used in the hash function when generating
-# node hashes.
-# If it is not set then it will be randomly generated.
-salt_s = \"salt_s\"
-
-# Height of the tree.
-# If not set the default height will be used.
-height = 16
-
-# Max number of threads to be spawned for multi-threading algorithms.
-# If not set the max parallelism of the underlying machine will be used.
-max_thread_count = 4
-
-# Can be a file or directory (default file name given in this case)
-# If not present then no serialization is done.
-serialization_path = \"./tree.dapoltree\"
-
-# At least one of file_path & generate_random must be present.
-# If both are given then file_path is preferred and generate_random is ignored.
-[entities]
-
-# Path to a file containing a list of entity IDs and their liabilities.
-file_path = \"./examples/entities_example.csv\"
-
-# Generate the given number of entities, with random IDs & liabilities.
-# This is useful for testing.
-generate_random = 4
-```";
+",
+    include_str!("../examples/tree_config_example.toml"),
+    "
+```"
+);

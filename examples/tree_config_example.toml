@@ -1,36 +1,53 @@
-# Accumulator type of the tree.
+# There are various different accumulator types (e.g. NDM-SMT).
+#
 # This value must be set.
 accumulator_type = "ndm-smt"
 
 # This value is known only to the tree generator, and is used to
 # determine all other secret values needed in the tree.
+#
 # This value must be set.
 master_secret = "master_secret"
 
 # This is a public value that is used to aid the KDF when generating secret
 # blinding factors for the Pedersen commitments.
+#
 # If it is not set then it will be randomly generated.
 salt_b = "salt_b"
 
 # This is a public value that is used to aid the KDF when generating secret
 # salt values, which are in turn used in the hash function when generating
 # node hashes.
+#
 # If it is not set then it will be randomly generated.
 salt_s = "salt_s"
 
 # Height of the tree.
-# If not set the default height will be used.
+#
+# If not set the default height will be used:
+# `dapol::Height::default()`.
 height = 16
 
+# This is a public value representing the maximum amount that any single
+# entity's liability can be, and is used in the range proofs:
+# $[0, 2^{\text{height}} \times \text{max_liability}]$
+#
+# If not set then the default value will be used:
+# `2.pow(dapol::DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH)`.
+max_liability = 10_000_000
+
 # Max number of threads to be spawned for multi-threading algorithms.
+#
 # If not set the max parallelism of the underlying machine will be used.
 max_thread_count = 4
 
 # Can be a file or directory (default file name given in this case)
-# If not present then no serialization is done.
+#
+# If not set then no serialization is done.
 serialization_path = "./tree.dapoltree"
 
 # At least one of file_path & generate_random must be present.
+#
 # If both are given then file_path is preferred and generate_random is ignored.
 [entities]
 

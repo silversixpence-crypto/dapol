@@ -24,6 +24,8 @@ fn main() {
         } => {
             initialize_machine_parallelism();
 
+            // It's not necessary to do this first, but it allows fast-failure
+            // for bad paths.
             let serialization_path =
                 // Do not try serialize if the command is Deserialize because
                 // this means there already is a serialized file.
@@ -43,23 +45,26 @@ fn main() {
 
             let dapol_tree: DapolTree = match build_kind {
                 BuildKindCommand::New {
-                    accumulator_type: accumulator,
-                    height,
-                    max_thread_count,
-                    secrets_file,
+                    accumulator_type,
                     salt_b,
                     salt_s,
+                    height,
+                    max_liability,
+                    max_thread_count,
+                    secrets_file,
                     entity_source,
                 } => DapolConfigBuilder::default()
+                    .accumulator_type(accumulator_type)
+                    .salt_b_opt(salt_b)
+                    .salt_s_opt(salt_s)
+                    .max_liability(max_liability)
                     .height(height)
                     .max_thread_count(max_thread_count)
-                    .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
-                    .salt_b(salt_b)
-                    .salt_s(salt_s)
                     .entities_file_path_opt(
                         entity_source.entities_file.and_then(|arg| arg.into_path()),
                     )
                     .num_random_entities_opt(entity_source.random_entities)
+                    .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
                     .build()
                     .log_on_err_unwrap()
                     .parse()

@@ -55,7 +55,8 @@ pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T
 ///
 /// `path` can be either of the following:
 /// 1. Existing directory: in this case a default file name is appended to
-/// `path`. 2. Non-existing directory: in this case all dirs in the path are
+/// `path`.
+/// 2. Non-existing directory: in this case all dirs in the path are
 /// created, and a default file name is appended.
 /// 3. File in existing dir: in this case the extension is checked to be
 /// `expected_extension`, then `path` is returned.

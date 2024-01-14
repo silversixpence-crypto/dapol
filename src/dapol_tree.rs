@@ -46,26 +46,29 @@ impl DapolTree {
     /// An error is returned if the underlying accumulator type construction
     /// fails.
     ///
-    /// - `accumulator_type`: Accumulator type of the tree. This value must be
-    ///   set.
+    /// - `accumulator_type`: This value must be set.
+    #[doc = include_str!("./shared_docs/accumulator_type.md")]
     /// - `master_secret`: This value is known only to the tree generator, and
     ///   is used to determine all other secret values needed in the tree. This
     ///   value must be set.
-    /// - `salt_b`: This is a public value that is used to aid the KDF when
-    ///   generating secret blinding factors for the Pedersen commitments. If it
-    ///   is not set then it will be randomly generated.
-    /// - `salt_s`: This is a public value that is used to aid the KDF when
-    ///   generating secret salt values, which are in turn used in the hash
-    ///   function when generating node hashes. If it is not set then it will be
+    /// - `salt_b`: If not set then it will be randomly generated.
+    #[doc = include_str!("./shared_docs/salt_b.md")]
+    /// - `salt_s`: If not set then it will be
     ///   randomly generated.
-    /// - `height`: Height of the tree. If not set the default height will be
-    ///   used.
-    /// - `max_thread_count`: Max number of threads to be spawned for
-    ///   multi-threading algorithms. If not set the max parallelism of the
+    #[doc = include_str!("./shared_docs/salt_s.md")]
+    /// - `max_liability`: If not set then a default value is used.
+    #[doc = include_str!("./shared_docs/max_liability.md")]
+    /// - `height`: If not set the [default height] will be used [crate][Height].
+    #[doc = include_str!("./shared_docs/height.md")]
+    /// - `max_thread_count`: If not set the max parallelism of the
     ///   underlying machine will be used.
+    #[doc = include_str!("./shared_docs/max_thread_count.md")]
     /// - `secrets_file_path`: Path to the secrets file. If not present the
     ///   secrets will be generated randomly.
-    /// - `entities`: vector of [crate][Entity]
+    /// - `entities`:
+    #[doc = include_str!("./shared_docs/entities_vector.md")]
+    ///
+    /// [default height]: crate::Height::default
     // STENT TODO give example
     pub fn new(
         accumulator_type: AccumulatorType,
@@ -114,6 +117,7 @@ impl DapolTree {
     /// to require bounds higher than $2^256$. Note that if the value is set
     /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
     /// an Err.
+    // STENT TODO use the max_liability value to calculate upper_bound_bit_length
     pub fn generate_inclusion_proof_with(
         &self,
         entity_id: &EntityId,
@@ -152,46 +156,32 @@ impl DapolTree {
 // Accessor methods.
 
 impl DapolTree {
-    /// Type of accumulator used.
+    #[doc = include_str!("./shared_docs/accumulator_type.md")]
     pub fn accumulator_type(&self) -> AccumulatorType {
         self.accumulator.get_type()
     }
 
-    /// Tree generator's singular secret value.
-    ///
-    /// This value is known only to the tree generator, and is used to
-    /// determine all other secret values needed in the tree.
+    #[doc = include_str!("./shared_docs/master_secret.md")]
     pub fn master_secret(&self) -> &Secret {
         &self.master_secret
     }
 
-    /// Return the Pedersen commitment blinding factor salt value.
-    ///
-    /// This is a public value that is used to aid the KDF when generating
-    /// secret blinding factors for the Pedersen commitments
+    #[doc = include_str!("./shared_docs/salt_b.md")]
     pub fn salt_b(&self) -> &Salt {
         &self.salt_b
     }
 
-    /// Return the hash function salt value.
-    ///
-    /// This is a public value that is used to aid the KDF when generating
-    /// secret salt values, which are in turn used in the hash function when
-    /// generating node hashes.
+    #[doc = include_str!("./shared_docs/salt_s.md")]
     pub fn salt_s(&self) -> &Salt {
         &self.salt_s
     }
 
-    /// Return the maximum singular liability.
-    ///
-    /// This is a public value representing the maximum amount that any
-    /// single entity's liability can be, and is used in the range proofs:
-    /// $[0, 2^{\text{height}} \times \text{max_liability}]$
+    #[doc = include_str!("./shared_docs/max_liability.md")]
     pub fn max_liability(&self) -> u64 {
         self.max_liability
     }
 
-    /// Return the height of the tree.
+    #[doc = include_str!("./shared_docs/height.md")]
     pub fn height(&self) -> &Height {
         self.accumulator.height()
     }
@@ -284,6 +274,8 @@ impl DapolTree {
     /// 1. [bincode] fails to serialize the file.
     /// 2. There is an issue opening or writing the file.
     pub fn serialize(&self, path: PathBuf) -> Result<(), DapolTreeError> {
+        let path = DapolTree::parse_serialization_path(path)?;
+
         info!(
             "Serializing accumulator to file {:?}",
             path.clone().into_os_string()

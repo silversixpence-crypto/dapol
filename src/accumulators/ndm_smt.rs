@@ -53,6 +53,19 @@ pub struct NdmSmt {
 impl NdmSmt {
     /// Constructor.
     ///
+    /// Parameters:
+    /// - `master_secret`:
+    #[doc = include_str!("../shared_docs/master_secret.md")]
+    /// - `salt_b`:
+    #[doc = include_str!("../shared_docs/salt_b.md")]
+    /// - `salt_s`:
+    #[doc = include_str!("../shared_docs/salt_s.md")]
+    /// - `height`:
+    #[doc = include_str!("../shared_docs/height.md")]
+    /// - `max_thread_count`:
+    #[doc = include_str!("../shared_docs/max_thread_count.md")]
+    /// - `entities`:
+    #[doc = include_str!("../shared_docs/entities_vector.md")]
     /// Each element in `entities` is converted to an
     /// [input leaf node] and randomly assigned a position on the
     /// bottom layer of the tree.
@@ -85,15 +98,11 @@ impl NdmSmt {
             "\nCreating NDM-SMT with the following configuration:\n \
              - height: {}\n \
              - number of entities: {}\n \
-             - master secret: 0x{}\n \
+             - master secret: <REDACTED>\n \
              - salt b: 0x{}\n \
              - salt s: 0x{}",
             height.as_u32(),
             entities.len(),
-            master_secret_bytes
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<String>(),
             salt_b_bytes
                 .iter()
                 .map(|b| format!("{:02x}", b))
@@ -186,12 +195,19 @@ impl NdmSmt {
     /// factor for the range proof, which are both required for the range
     /// proof that is done in the [InclusionProof] constructor.
     ///
-    /// `aggregation_factor` is used to determine how many of the range proofs
+    /// Parameters:
+    /// - `master_secret`:
+    #[doc = include_str!("../shared_docs/master_secret.md")]
+    /// - `salt_b`:
+    #[doc = include_str!("../shared_docs/salt_b.md")]
+    /// - `salt_s`:
+    #[doc = include_str!("../shared_docs/salt_s.md")]
+    /// - `entity_id`: unique ID for the entity that the proof will be generated for.
+    /// - `aggregation_factor` is used to determine how many of the range proofs
     /// are aggregated. Those that do not form part of the aggregated proof
     /// are just proved individually. The aggregation is a feature of the
     /// Bulletproofs protocol that improves efficiency.
-    ///
-    /// `upper_bound_bit_length` is used to determine the upper bound for the
+    /// - `upper_bound_bit_length` is used to determine the upper bound for the
     /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
     /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
     /// some liability. The type is set to `u8` because we are not expected
@@ -239,6 +255,15 @@ impl NdmSmt {
     /// - `aggregation_factor`: half of all the range proofs are aggregated
     /// - `upper_bound_bit_length`: 64 (which should be plenty enough for most
     ///   real-world cases)
+    ///
+    /// Parameters:
+    /// - `master_secret`:
+    #[doc = include_str!("../shared_docs/master_secret.md")]
+    /// - `salt_b`:
+    #[doc = include_str!("../shared_docs/salt_b.md")]
+    /// - `salt_s`:
+    #[doc = include_str!("../shared_docs/salt_s.md")]
+    /// - `entity_id`: unique ID for the entity that the proof will be generated for.
     pub fn generate_inclusion_proof(
         &self,
         master_secret: &Secret,
@@ -266,7 +291,6 @@ impl NdmSmt {
         &self.entity_mapping
     }
 
-    /// Return the height of the binary tree.
     pub fn height(&self) -> &Height {
         self.binary_tree.height()
     }

@@ -23,48 +23,7 @@ use crate::{salt, secret};
 /// following format:
 ///
 /// ```toml,ignore
-/// # Accumulator type of the tree.
-/// # This value must be set.
-/// accumulator_type = "ndm-smt"
-///
-/// # This value is known only to the tree generator, and is used to
-/// # determine all other secret values needed in the tree.
-/// # This value must be set.
-/// master_secret = "master_secret"
-///
-/// # This is a public value that is used to aid the KDF when generating secret
-/// # blinding factors for the Pedersen commitments.
-/// # If it is not set then it will be randomly generated.
-/// salt_b = "salt_b"
-///
-/// # This is a public value that is used to aid the KDF when generating secret
-/// # salt values, which are in turn used in the hash function when generating
-/// # node hashes.
-/// # If it is not set then it will be randomly generated.
-/// salt_s = "salt_s"
-///
-/// # Height of the tree.
-/// # If not set the default height will be used.
-/// height = 32
-///
-/// # Max number of threads to be spawned for multi-threading algorithms.
-/// # If not set the max parallelism of the underlying machine will be used.
-/// max_thread_count = 4
-///
-/// # Path to the secrets file.
-/// # If not present the secrets will be generated randomly.
-/// secrets_file_path = "./examples/ndm_smt_secrets_example.toml"
-///
-/// # At least one of file_path & generate_random must be present.
-/// # If both are given then file_path is preferred and generate_random is ignored.
-/// [entities]
-///
-/// # Path to a file containing a list of entity IDs and their liabilities.
-/// file_path = "./examples/entities_example.csv"
-///
-/// # Generate the given number of entities, with random IDs & liabilities.
-/// # This is useful for testing.
-/// generate_random = 4
+#[doc = include_str!("../examples/tree_config_example.toml")]
 /// ```
 ///
 // STENT TODO this is not true anymore
@@ -91,14 +50,27 @@ use crate::{salt, secret};
 #[serde(rename_all = "kebab-case")]
 #[builder(build_fn(skip))]
 pub struct DapolConfig {
+    #[doc = include_str!("./shared_docs/accumulator_type.md")]
     accumulator_type: AccumulatorType,
+
+    #[doc = include_str!("./shared_docs/salt_b.md")]
     salt_b: Salt,
+
+    #[doc = include_str!("./shared_docs/salt_s.md")]
     salt_s: Salt,
+
+    #[doc = include_str!("./shared_docs/max_liability.md")]
     max_liability: u64,
+
+    #[doc = include_str!("./shared_docs/height.md")]
     height: Height,
+
+    #[doc = include_str!("./shared_docs/max_thread_count.md")]
     max_thread_count: MaxThreadCount,
+
     #[builder(private)]
     entities: EntityConfig,
+
     // STENT TODO in docs & examples we'll have to make this look like entities
     #[builder(private)]
     secrets: SecretsConfig,
@@ -193,11 +165,31 @@ impl DapolConfigBuilder {
     }
 
     /// Set the master secret value directly.
+    ///
+    #[doc = include_str!("./shared_docs/master_secret.md")]
     pub fn master_secret(&mut self, master_secret: Secret) -> &mut Self {
         self.secrets = Some(SecretsConfig {
             file_path: None,
             master_secret: Some(master_secret),
         });
+        self
+    }
+
+    #[doc = include_str!("./shared_docs/salt_b.md")]
+    ///
+    /// Wrapped in an option to provide ease of use if the value is already
+    /// an option.
+    pub fn salt_b_opt(&mut self, salt_b: Option<Salt>) -> &mut Self {
+        self.salt_b = salt_b;
+        self
+    }
+
+    #[doc = include_str!("./shared_docs/salt_s.md")]
+    ///
+    /// Wrapped in an option to provide ease of use if the value is already
+    /// an option.
+    pub fn salt_s_opt(&mut self, salt_s: Option<Salt>) -> &mut Self {
+        self.salt_s = salt_s;
         self
     }
 
