@@ -2,7 +2,7 @@
 //!
 //! See [MAIN_LONG_ABOUT] for more information.
 
-use clap::{command, Args, Parser, Subcommand, ValueEnum};
+use clap::{command, Args, Parser, Subcommand};
 use clap_verbosity_flag::{Verbosity, WarnLevel};
 use patharg::{InputArg, OutputArg};
 use primitive_types::H256;
@@ -10,9 +10,11 @@ use primitive_types::H256;
 use std::str::FromStr;
 
 use crate::{
+    accumulators::AccumulatorType,
     binary_tree::Height,
     inclusion_proof::DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
-    percentage::{Percentage, ONE_HUNDRED_PERCENT}, MaxThreadCount,
+    percentage::{Percentage, ONE_HUNDRED_PERCENT},
+    MaxThreadCount, Salt,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -44,7 +46,7 @@ pub enum Command {
     /// Inclusion proofs can be generated, but configuration is not supported.
     /// If you want more config options then use the `gen-proofs` command.
     BuildTree {
-        /// Choose the accumulator type for the tree.
+        /// Config DAPOL tree.
         #[command(subcommand)]
         build_kind: BuildKindCommand,
 
@@ -111,7 +113,7 @@ pub enum BuildKindCommand {
     New {
         /// Choose an accumulator type for the tree.
         #[arg(short, long, value_enum)]
-        accumulator: AccumulatorType,
+        accumulator_type: AccumulatorType,
 
         /// Height to use for the binary tree.
         #[arg(long, value_parser = Height::from_str, default_value = Height::default(), value_name = "U8_INT")]
@@ -121,8 +123,20 @@ pub enum BuildKindCommand {
         #[arg(long, value_parser = MaxThreadCount::from_str, default_value = MaxThreadCount::default(), value_name = "U8_INT")]
         max_thread_count: MaxThreadCount,
 
-        #[arg(short, long, value_name = "FILE_PATH", long_help = NDM_SMT_SECRETS_HELP)]
+        #[arg(short, long, value_name = "FILE_PATH", long_help = SECRETS_HELP)]
         secrets_file: Option<InputArg>,
+
+        /// This is a public value that is used to aid the KDF when generating
+        /// secret blinding factors for the Pedersen commitments
+        // STENT TODO the salts should have the option to be set via bytes as opposed to string
+        #[arg(long, value_parser = Salt::from_str, default_value = Salt::default())]
+        salt_b: Salt,
+
+        /// This is a public value that is used to aid the KDF when generating
+        /// secret salt values, which are in turn used in the hash function when
+        /// generating node hashes.
+        #[arg(long, value_parser = Salt::from_str, default_value = Salt::default())]
+        salt_s: Salt,
 
         #[command(flatten)]
         entity_source: EntitySource,
@@ -136,12 +150,6 @@ pub enum BuildKindCommand {
 
     /// Deserialize a tree from a .dapoltree file.
     Deserialize { path: InputArg },
-}
-
-#[derive(ValueEnum, Debug, Clone)]
-pub enum AccumulatorType {
-    NdmSmt,
-    // TODO other accumulators..
 }
 
 #[derive(Args, Debug)]
@@ -187,12 +195,10 @@ overwritten (if it exists) or created (if it does not exist). The file
 extension must be `.dapoltree`. The serialization option is ignored if
 `build-tree deserialize` command is used.";
 
-const NDM_SMT_SECRETS_HELP: &str = "
+const SECRETS_HELP: &str = "
 TOML file containing secrets. The file format is as follows:
 ```
 master_secret = \"master_secret\"
-salt_b = \"salt_b\"
-salt_s = \"salt_s\"
 ```
 All secrets should have at least 128-bit security, but need not be chosen from a
 uniform distribution as they are passed through a key derivation function before
@@ -206,37 +212,54 @@ CSV file format:
 entity_id,liability";
 
 const COMMAND_CONFIG_FILE_ABOUT: &str =
-    "Read accumulator type and other tree configuration from a file. Supported file formats: TOML.";
+    "Read tree configuration from a file. Supported file formats: TOML.";
 
 const COMMAND_CONFIG_FILE_LONG_ABOUT: &str = "
-Read accumulator type and other tree configuration from a file.
+Read tree configuration from a file.
 Supported file formats: TOML.
 
 Config file format (TOML):
 ```
 # Accumulator type of the tree.
-# This value determines what other values are required.
+# This value must be set.
 accumulator_type = \"ndm-smt\"
 
+# This value is known only to the tree generator, and is used to
+# determine all other secret values needed in the tree.
+# This value must be set.
+master_secret = \"master_secret\"
+
+# This is a public value that is used to aid the KDF when generating secret
+# blinding factors for the Pedersen commitments.
+# If it is not set then it will be randomly generated.
+salt_b = \"salt_b\"
+
+# This is a public value that is used to aid the KDF when generating secret
+# salt values, which are in turn used in the hash function when generating
+# node hashes.
+# If it is not set then it will be randomly generated.
+salt_s = \"salt_s\"
+
 # Height of the tree.
-# If the height is not set the default height will be used.
+# If not set the default height will be used.
 height = 16
 
-# Path to the secrets file.
-# If not present the secrets will be generated randomly.
-secrets_file_path = \"./examples/ndm_smt_secrets_example.toml\"
+# Max number of threads to be spawned for multi-threading algorithms.
+# If not set the max parallelism of the underlying machine will be used.
+max_thread_count = 4
 
 # Can be a file or directory (default file name given in this case)
 # If not present then no serialization is done.
 serialization_path = \"./tree.dapoltree\"
 
 # At least one of file_path & generate_random must be present.
-# If both are given then file_path is prioritized.
+# If both are given then file_path is preferred and generate_random is ignored.
 [entities]
 
 # Path to a file containing a list of entity IDs and their liabilities.
 file_path = \"./examples/entities_example.csv\"
 
 # Generate the given number of entities, with random IDs & liabilities.
+# This is useful for testing.
 generate_random = 4
 ```";

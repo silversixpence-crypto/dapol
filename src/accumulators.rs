@@ -1,3 +1,4 @@
+// STENT TODO change docs, they are stale
 //! Various accumulator variants of the DAPOL+ protocol.
 //!
 //! An accumulator defines how the binary tree is built. There are different
@@ -16,17 +17,12 @@
 //!
 //! [Non-Deterministic Mapping Sparse Merkle Tree]: crate::accumulators::NdmSmt
 
-mod config;
-pub use config::{AccumulatorConfig, AccumulatorConfigError, AccumulatorParserError};
+use clap::ValueEnum;
+use primitive_types::H256;
+use serde::{Deserialize, Serialize};
 
 mod ndm_smt;
-use displaydoc::Display;
-pub use ndm_smt::{
-    NdmSmt, NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtConfigParserError, NdmSmtError, NdmSmtSecrets,
-    NdmSmtSecretsParser, RandomXCoordGenerator,
-};
-
-use serde::{Deserialize, Serialize};
+pub use ndm_smt::{NdmSmt, NdmSmtError, RandomXCoordGenerator};
 
 use crate::Height;
 
@@ -38,21 +34,30 @@ pub enum Accumulator {
 }
 
 impl Accumulator {
+    /// Height of the binary tree.
     pub fn height(&self) -> &Height {
         match self {
-            Accumulator::NdmSmt(ndm_smt) => ndm_smt.height()
+            Accumulator::NdmSmt(ndm_smt) => ndm_smt.height(),
         }
     }
 
+    /// Return the accumulator type.
     pub fn get_type(&self) -> AccumulatorType {
         match self {
             Self::NdmSmt(_) => AccumulatorType::NdmSmt,
         }
     }
+
+    /// Return the hash digest/bytes of the root node for the binary tree.
+    pub fn root_hash(&self) -> H256 {
+        match self {
+            Self::NdmSmt(ndm_smt) => ndm_smt.root_hash(),
+        }
+    }
 }
 
 /// Various supported accumulator types.
-#[derive(Deserialize, Debug, Display)]
+#[derive(Clone, Deserialize, Debug, ValueEnum)]
 #[serde(rename_all = "kebab-case")]
 pub enum AccumulatorType {
     NdmSmt,
