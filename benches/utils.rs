@@ -20,6 +20,7 @@ pub fn abs_diff(x: usize, y: usize) -> usize {
 }
 
 pub fn bytes_to_string(num_bytes: usize) -> String {
+    println!("bytes {:?}", num_bytes);
     let n = num_bytes as u64;
 
     let kb = 1024u64;

@@ -198,6 +198,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 
     for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
         for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
+            println!("height {:?}", h);
             {
                 // TODO the python script needs to be run again.
                 // see memory_usage_estimation.rs for more info.
