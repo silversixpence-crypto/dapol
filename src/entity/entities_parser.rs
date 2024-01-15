@@ -218,4 +218,6 @@ mod tests {
             .unwrap();
         assert_eq!(entities.len(), num_entities as usize);
     }
+
+    // STENT TODO test failure cases like unsupported file type (see dapol_config tests for copypasta)
 }

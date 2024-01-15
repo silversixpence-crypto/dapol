@@ -27,7 +27,7 @@ pub use ndm_smt::{NdmSmt, NdmSmtError, RandomXCoordGenerator};
 use crate::Height;
 
 /// Supported accumulators, with their linked data.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Accumulator {
     NdmSmt(ndm_smt::NdmSmt),
     // TODO add other accumulators..
@@ -57,7 +57,7 @@ impl Accumulator {
 }
 
 /// Various supported accumulator types.
-#[derive(Clone, Deserialize, Debug, ValueEnum)]
+#[derive(Clone, Deserialize, Debug, ValueEnum, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub enum AccumulatorType {
     NdmSmt,

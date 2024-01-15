@@ -73,8 +73,8 @@ impl DapolTree {
     pub fn new(
         accumulator_type: AccumulatorType,
         master_secret: Secret,
-        salt_s: Salt,
         salt_b: Salt,
+        salt_s: Salt,
         max_liability: MaxLiability,
         max_thread_count: MaxThreadCount,
         height: Height,
@@ -184,6 +184,11 @@ impl DapolTree {
     #[doc = include_str!("./shared_docs/height.md")]
     pub fn height(&self) -> &Height {
         self.accumulator.height()
+    }
+
+    /// Get the underlying data associated with the accumulator.
+    pub fn accumultor(&self) -> &Accumulator {
+        &self.accumulator
     }
 
     /// Return the hash digest/bytes of the root node for the binary tree.

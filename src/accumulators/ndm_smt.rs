@@ -8,16 +8,16 @@ use logging_timer::{timer, Level};
 
 use rayon::prelude::*;
 
-use crate::binary_tree::FullNodeContent;
-use crate::binary_tree::{
-    BinaryTree, BinaryTreeBuilder, Coordinate, Height, InputLeafNode, PathSiblings,
+use crate::{
+    binary_tree::{
+        BinaryTree, BinaryTreeBuilder, Coordinate, FullNodeContent, Height, InputLeafNode,
+        PathSiblings,
+    },
+    entity::{Entity, EntityId},
+    inclusion_proof::{AggregationFactor, InclusionProof},
+    kdf::generate_key,
+    MaxThreadCount, Salt, Secret, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
 };
-use crate::entity::{Entity, EntityId};
-use crate::inclusion_proof::{
-    AggregationFactor, InclusionProof, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
-};
-use crate::kdf::generate_key;
-use crate::{MaxThreadCount, Salt, Secret};
 
 mod x_coord_generator;
 pub use x_coord_generator::RandomXCoordGenerator;
