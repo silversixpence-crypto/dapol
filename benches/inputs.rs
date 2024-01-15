@@ -5,7 +5,7 @@ use dapol::{Height, MaxThreadCount};
 /// We only bench for heights 16, 32 & 64 because smaller than 16 is fairly
 /// useless in practice and greater than 64 is not supported yet.
 pub fn tree_heights() -> Vec<Height> {
-    let tree_heights: Vec<u8> = Vec::from([16, 32, 64]);
+    let tree_heights: Vec<u8> = Vec::from([16, 24, 32, 40, 48, 56, 64]);
     tree_heights
         .into_iter()
         .map(|x| Height::expect_from(x))

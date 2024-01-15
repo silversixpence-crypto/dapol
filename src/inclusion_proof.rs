@@ -6,7 +6,7 @@ use std::{fmt::Debug, path::PathBuf};
 use log::info;
 
 use crate::binary_tree::{Coordinate, Height, Node, PathSiblings};
-use crate::node_content::{FullNodeContent, HiddenNodeContent};
+use crate::node_content::{FullNodeContent, HiddenNodeContent, CompressedNode};
 use crate::{read_write_utils, EntityId};
 
 mod individual_range_proof;
@@ -230,7 +230,7 @@ impl InclusionProof {
     /// An error is returned if
     /// 1. [bincode] fails to serialize the file.
     /// 2. There is an issue opening or writing the file.
-    pub fn serialize(&self, entity_id: &EntityId, dir: PathBuf) -> Result<PathBuf, InclusionProofError> {
+    pub fn serialize(self, entity_id: &EntityId, dir: PathBuf) -> Result<PathBuf, InclusionProofError> {
         let mut file_name = entity_id.to_string();
         file_name.push('.');
         file_name.push_str(SERIALIZED_PROOF_EXTENSION);
@@ -238,7 +238,12 @@ impl InclusionProof {
         let path = dir.join(file_name);
         info!("Serializing inclusion proof to path {:?}", path);
 
-        read_write_utils::serialize_to_bin_file(&self, path.clone())?;
+        let compressed = InclusionProofCompressed {
+            path_siblings: self.path_siblings.convert(),
+            aggregated_range_proof: self.aggregated_range_proof,
+        };
+
+        read_write_utils::serialize_to_bin_file(&compressed, path.clone())?;
 
         Ok(path)
     }
@@ -255,6 +260,12 @@ impl InclusionProof {
         let proof: InclusionProof = read_write_utils::deserialize_from_bin_file(file_path)?;
         Ok(proof)
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InclusionProofCompressed {
+    path_siblings: PathSiblings<CompressedNode>,
+    aggregated_range_proof: Option<AggregatedRangeProof>,
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -253,20 +253,10 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 
             let mut proof = Option::<InclusionProof>::None;
 
-            group.bench_function(
-                BenchmarkId::new(
-                    "generate_proof",
-                    format!("height_{}/num_entities_{}", h.as_u32(), n),
-                ),
-                |bench| {
-                    bench.iter(|| {
-                        proof = Some(
-                            ndm_smt
-                                .generate_inclusion_proof(entity_id)
-                                .expect("Proof should have been generated successfully"),
-                        );
-                    });
-                },
+            proof = Some(
+                ndm_smt
+                    .generate_inclusion_proof(entity_id)
+                    .expect("Proof should have been generated successfully"),
             );
 
             // =============================================================
@@ -275,6 +265,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
             let src_dir = env!("CARGO_MANIFEST_DIR");
             let target_dir = Path::new(&src_dir).join("target");
             let dir = target_dir.join("serialized_proofs");
+            std::fs::create_dir_all(dir.clone()).unwrap();
             let path = proof
                 .expect("Proof should be set")
                 .serialize(entity_id, dir)
@@ -378,7 +369,7 @@ use std::time::Duration;
 criterion_group! {
     name = wall_clock_time;
     config = Criterion::default().sample_size(10).measurement_time(Duration::from_secs(600));
-    targets = bench_build_tree, bench_generate_proof, bench_verify_proof
+    targets = bench_generate_proof
 }
 
 // Does not work, see memory_measurement.rs
