@@ -3,12 +3,6 @@
 # This value must be set.
 accumulator_type = "ndm-smt"
 
-# This value is known only to the tree generator, and is used to
-# determine all other secret values needed in the tree.
-#
-# This value must be set.
-master_secret = "master_secret"
-
 # This is a public value that is used to aid the KDF when generating secret
 # blinding factors for the Pedersen commitments.
 #
@@ -39,21 +33,34 @@ max_liability = 10_000_000
 # Max number of threads to be spawned for multi-threading algorithms.
 #
 # If not set the max parallelism of the underlying machine will be used.
-max_thread_count = 4
+max_thread_count = 8
 
 # Can be a file or directory (default file name given in this case)
 #
 # If not set then no serialization is done.
 serialization_path = "./tree.dapoltree"
 
-# At least one of file_path & generate_random must be present.
+# At least one of file_path or generate_random must be present.
 #
 # If both are given then file_path is preferred and generate_random is ignored.
 [entities]
 
 # Path to a file containing a list of entity IDs and their liabilities.
-file_path = "./examples/entities_example.csv"
+file_path = "./entities_example.csv"
 
 # Generate the given number of entities, with random IDs & liabilities.
 # This is useful for testing.
-generate_random = 4
+num_random_entities= 100
+
+# At least on of file_path or master_secret must be present.
+# The master secret is known only to the tree generator and is used to
+# generate all other secret values required by the tree.
+#
+# If both are given then file_path is preferred and master_secret is ignored.
+[secrets]
+
+# Path to a file containing a list of entity IDs and their liabilities.
+file_path = "./dapol_secrets_example.toml"
+
+# String value of the master secret.
+master_secret = "master_secret"

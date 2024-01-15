@@ -66,18 +66,18 @@ The CLI offers 3 main operations: tree building, proof generation & proof verifi
 #### Tree building
 
 Building a tree can be done:
-- from a config file (see tree_config_example.toml)
+- from a config file (see dapol_config_example.toml)
 - from CLI arguments
 - by deserializing an already-built tree
 
 Build a tree using config file (full log verbosity):
 ```bash
-./target/release/dapol -vvv build-tree config-file ./examples/tree_config_example.toml
+./target/release/dapol -vvv build-tree config-file ./examples/dapol_config_example.toml
 ```
 
 Add serialization:
 ```bash
-./target/release/dapol -vvv build-tree config-file ./examples/tree_config_example.toml --serialize .
+./target/release/dapol -vvv build-tree config-file ./examples/dapol_config_example.toml --serialize .
 ```
 
 Deserialize a tree from a file:
@@ -87,7 +87,7 @@ Deserialize a tree from a file:
 
 Generate proofs (proofs will live in the `./inclusion_proofs/` directory):
 ```bash
-./target/release/dapol -vvv build-tree config-file ./examples/tree_config_example.toml --gen-proofs ./examples/entities_example.csv
+./target/release/dapol -vvv build-tree config-file ./examples/dapol_config_example.toml --gen-proofs ./examples/entities_example.csv
 ```
 
 Build a tree using cli args as apposed to a config file:

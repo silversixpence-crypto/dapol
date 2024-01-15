@@ -151,7 +151,7 @@
 //! pub fn build_accumulator_using_config_file() -> dapol::Accumulator {
 //!     let src_dir = env!("CARGO_MANIFEST_DIR");
 //!     let resources_dir = Path::new(&src_dir).join("examples");
-//!     let config_file = resources_dir.join("tree_config_example.toml");
+//!     let config_file = resources_dir.join("dapol_config_example.toml");
 //!
 //!     dapol::AccumulatorConfig::deserialize(config_file)
 //!         .log_on_err_unwrap()
