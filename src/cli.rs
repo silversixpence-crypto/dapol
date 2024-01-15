@@ -12,9 +12,8 @@ use std::str::FromStr;
 use crate::{
     accumulators::AccumulatorType,
     binary_tree::Height,
-    inclusion_proof::DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
     percentage::{Percentage, ONE_HUNDRED_PERCENT},
-    MaxThreadCount, Salt,
+    MaxLiability, MaxThreadCount, Salt, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -124,8 +123,8 @@ pub enum BuildKindCommand {
         #[arg(long, value_parser = Height::from_str, default_value = Height::default(), value_name = "U8_INT", help = include_str!("./shared_docs/height.md"))]
         height: Height,
 
-        #[arg(long, value_name = "U64_INT", help = include_str!("./shared_docs/max_liability.md"))]
-        max_liability: u64,
+        #[arg(long, value_parser = MaxLiability::from_str, default_value = MaxLiability::default(), value_name = "U64_INT", help = include_str!("./shared_docs/max_liability.md"))]
+        max_liability: MaxLiability,
 
         #[arg(long, value_parser = MaxThreadCount::from_str, default_value = MaxThreadCount::default(), value_name = "U8_INT", help = include_str!("./shared_docs/max_thread_count.md"))]
         max_thread_count: MaxThreadCount,
@@ -217,7 +216,7 @@ Supported file formats: TOML.
 Config file format (TOML):
 ```
 ",
-    include_str!("../examples/tree_config_example.toml"),
+    include_str!("../examples/dapol_config_example.toml"),
     "
 ```"
 );

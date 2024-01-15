@@ -60,7 +60,7 @@ pub struct DapolConfig {
     salt_s: Salt,
 
     #[doc = include_str!("./shared_docs/max_liability.md")]
-    max_liability: u64,
+    max_liability: MaxLiability,
 
     #[doc = include_str!("./shared_docs/height.md")]
     height: Height,
@@ -202,11 +202,6 @@ impl DapolConfigBuilder {
                     "accumulator_type",
                 ))?;
 
-        let max_liability = self
-            .max_liability
-            .clone()
-            .unwrap_or(2u64.pow(DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH as u32));
-
         let entities = EntityConfig {
             file_path: self.entities.clone().and_then(|e| e.file_path).or(None),
             num_random_entities: self
@@ -225,6 +220,7 @@ impl DapolConfigBuilder {
         let salt_s = self.salt_s.clone().unwrap_or_default();
         let height = self.height.unwrap_or_default();
         let max_thread_count = self.max_thread_count.unwrap_or_default();
+        let max_liability = self.max_liability.unwrap_or_default();
 
         Ok(DapolConfig {
             accumulator_type,

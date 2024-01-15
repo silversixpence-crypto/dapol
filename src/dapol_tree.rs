@@ -7,7 +7,7 @@ use crate::{
     accumulators::{Accumulator, AccumulatorType, NdmSmt, NdmSmtError},
     read_write_utils::{self, ReadWriteError},
     utils::LogOnErr,
-    AggregationFactor, Entity, EntityId, Height, InclusionProof, MaxThreadCount, Salt, Secret,
+    AggregationFactor, Entity, EntityId, Height, InclusionProof, MaxThreadCount, Salt, Secret, MaxLiability,
 };
 
 // STENT TODO should we change the extension to 'dapol'?
@@ -28,13 +28,13 @@ const SERIALIZED_TREE_FILE_PREFIX: &str = "accumulator_";
 /// config for the NDM-SMT accumulator type using a builder pattern. The config
 /// can then be parsed to construct an NDM-SMT.
 // STENT TODO give example usage
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DapolTree {
     accumulator: Accumulator,
     master_secret: Secret,
     salt_s: Salt,
     salt_b: Salt,
-    max_liability: u64,
+    max_liability: MaxLiability,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -75,7 +75,7 @@ impl DapolTree {
         master_secret: Secret,
         salt_s: Salt,
         salt_b: Salt,
-        max_liability: u64,
+        max_liability: MaxLiability,
         max_thread_count: MaxThreadCount,
         height: Height,
         entities: Vec<Entity>,
@@ -177,7 +177,7 @@ impl DapolTree {
     }
 
     #[doc = include_str!("./shared_docs/max_liability.md")]
-    pub fn max_liability(&self) -> u64 {
+    pub fn max_liability(&self) -> MaxLiability {
         self.max_liability
     }
 

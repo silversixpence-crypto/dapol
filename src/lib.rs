@@ -185,6 +185,11 @@ pub use hasher::Hasher;
 mod max_thread_count;
 pub use max_thread_count::{initialize_machine_parallelism, MaxThreadCount, MACHINE_PARALLELISM};
 
+mod max_liability;
+pub use max_liability::{
+    MaxLiability, DEFAULT_MAX_LIABILITY, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
+};
+
 mod binary_tree;
 pub use binary_tree::{Height, HeightError, MAX_HEIGHT, MIN_HEIGHT};
 
@@ -192,10 +197,7 @@ mod secret;
 pub use secret::{Secret, SecretParserError};
 
 mod inclusion_proof;
-pub use inclusion_proof::{
-    AggregationFactor, InclusionProof, InclusionProofError,
-    DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
-};
+pub use inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 
 mod entity;
 pub use entity::{Entity, EntityId, EntityIdsParser, EntityIdsParserError};
