@@ -10,11 +10,8 @@ use crate::{
     AggregationFactor, Entity, EntityId, Height, InclusionProof, MaxThreadCount, Salt, Secret, MaxLiability,
 };
 
-// STENT TODO should we change the extension to 'dapol'?
 const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
-// STENT TODO we should change this 'cause it's from the old accumulator code,
-// but not sure to what, maybe 'proof_of_liabilities_merkle_sum_tree'
-const SERIALIZED_TREE_FILE_PREFIX: &str = "accumulator_";
+const SERIALIZED_TREE_FILE_PREFIX: &str = "proof_of_liabilities_merkle_sum_tree_";
 
 /// Proof of Liabilities Sparse Merkle Sum Tree.
 ///
@@ -304,4 +301,4 @@ pub enum DapolTreeError {
 }
 
 // -------------------------------------------------------------------------------------------------
-// NOTE no unit tests here because this code is tested in the integration tests.
+// STENT TODO test

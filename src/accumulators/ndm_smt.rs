@@ -357,13 +357,8 @@ mod tests {
     #[test]
     fn constructor_works() {
         let master_secret: Secret = 1u64.into();
-        let salt_b: Secret = 2u64.into();
-        let salt_s: Secret = 3u64.into();
-        let secrets = NdmSmtSecrets {
-            master_secret,
-            salt_b,
-            salt_s,
-        };
+        let salt_b: Salt = 2u64.into();
+        let salt_s: Salt = 3u64.into();
 
         let height = Height::expect_from(4u8);
         let max_thread_count = MaxThreadCount::default();
@@ -372,6 +367,6 @@ mod tests {
             id: EntityId::from_str("some entity").unwrap(),
         }];
 
-        NdmSmt::new(secrets, height, max_thread_count, entities).unwrap();
+        NdmSmt::new(master_secret, salt_b, salt_s, height, max_thread_count, entities).unwrap();
     }
 }

@@ -1,14 +1,13 @@
 use derive_builder::Builder;
 use log::{debug, info};
 use serde::Deserialize;
-use std::{ffi::OsString, fs::File, io::Read, ops::Deref, path::PathBuf, str::FromStr};
+use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use crate::{
     accumulators::AccumulatorType,
     entity::{self, EntitiesParser},
     utils::LogOnErr,
     DapolTree, DapolTreeError, Height, MaxLiability, MaxThreadCount, Salt, Secret,
-    DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
 };
 use crate::{salt, secret};
 
@@ -22,30 +21,84 @@ use crate::{salt, secret};
 #[doc = include_str!("../examples/dapol_config_example.toml")]
 /// ```
 ///
-// STENT TODO these examples need fixing
 /// Example of how to use the builder to construct a [crate][DapolTree]:
 /// ```
-/// use std::path::PathBuf;
-/// use dapol::{Height, MaxThreadCount};
-/// use dapol::accumulators::DapolConfigBuilder;
+/// use std::{path::PathBuf, str::FromStr};
+/// use dapol::{
+///     AccumulatorType, DapolConfigBuilder, DapolTree, Entity, Height,
+///     MaxLiability, MaxThreadCount, Salt, Secret,
+/// };
 ///
+/// let secrets_file_path =
+/// PathBuf::from("./examples/dapol_secrets_example.toml");
+/// let entities_file_path = PathBuf::from("./examples/entities_example.csv");
 /// let height = Height::expect_from(8);
-/// let max_thread_count = MaxThreadCount::default();
+/// let salt_b = Salt::from_str("salt_b").unwrap();
+/// let salt_s = Salt::from_str("salt_s").unwrap();
+/// let max_liability = MaxLiability::from(10_000_000);
+/// let max_thread_count = MaxThreadCount::from(8);
 ///
-/// let config = DapolConfigBuilder::default()
-///     .height(height)
-///     .secrets_file_path(PathBuf::from("./examples/ndm_smt_secrets_example.toml"))
-///     .entities_file_path(PathBuf::from("./examples/entities_example.csv"))
-///     .build();
+/// // The builder requires at least the following to be given:
+/// // - accumulator_type
+/// // - entities
+/// // - secrets
+/// let dapol_config = DapolConfigBuilder::default()
+///     .accumulator_type(AccumulatorType::NdmSmt)
+///     .height(height.clone())
+///     .salt_b(salt_b.clone())
+///     .salt_s(salt_s.clone())
+///     .max_liability(max_liability.clone())
+///     .max_thread_count(max_thread_count.clone())
+///     .secrets_file_path(secrets_file_path.clone())
+///     .entities_file_path(entities_file_path.clone())
+///     .build()
+///     .unwrap();
 /// ```
 ///
 /// Example of how to use a config file to construct a [crate][DapolTree]:
 /// ```
+/// use std::{path::PathBuf, str::FromStr};
+/// use dapol::DapolConfig;
+///
+/// let config_file_path =
+/// PathBuf::from("./examples/dapol_config_example.toml");
+/// let dapol_config_from_file =
+/// DapolConfig::deserialize(config_file_path).unwrap();
 /// ```
 ///
 /// Note that you can also construct a [crate][DapolTree] by calling the
 /// constructor directly:
 /// ```
+/// use std::str::FromStr;
+/// use dapol::{
+///     AccumulatorType, DapolTree, Entity, EntityId, Height, MaxLiability,
+///     MaxThreadCount, Salt, Secret,
+/// };
+///
+/// let accumulator_type = AccumulatorType::NdmSmt;
+/// let height = Height::expect_from(8);
+/// let salt_b = Salt::from_str("salt_b").unwrap();
+/// let salt_s = Salt::from_str("salt_s").unwrap();
+/// let master_secret = Secret::from_str("master_secret").unwrap();
+/// let max_liability = MaxLiability::from(10_000_000);
+/// let max_thread_count = MaxThreadCount::from(8);
+///
+/// let entity = Entity {
+///     liability: 1u64,
+///     id: EntityId::from_str("id").unwrap(),
+/// };
+/// let entities = vec![entity];
+///
+/// let dapol_tree = DapolTree::new(
+///     accumulator_type,
+///     master_secret,
+///     salt_b,
+///     salt_s,
+///     max_liability,
+///     max_thread_count,
+///     height,
+///     entities,
+/// ).unwrap();
 /// ```
 #[derive(Deserialize, Debug, Builder, PartialEq)]
 #[builder(build_fn(skip))]
@@ -164,7 +217,6 @@ impl DapolConfigBuilder {
     }
 
     /// Set the master secret value directly.
-    ///
     #[doc = include_str!("./shared_docs/master_secret.md")]
     pub fn master_secret(&mut self, master_secret: Secret) -> &mut Self {
         match &mut self.secrets {
@@ -310,10 +362,10 @@ impl DapolConfig {
             .with_num_entities_opt(self.entities.num_random_entities)
             .parse_file_or_generate_random()?;
 
-        let master_secret = if let Some(master_secret) = self.secrets.master_secret {
-            Ok(master_secret)
-        } else if let Some(path) = self.secrets.file_path {
+        let master_secret = if let Some(path) = self.secrets.file_path {
             Ok(DapolConfig::parse_secrets_file(path)?)
+        } else if let Some(master_secret) = self.secrets.master_secret {
+            Ok(master_secret)
         } else {
             Err(DapolConfigError::CannotFindMasterSecret)
         }?;
@@ -331,7 +383,8 @@ impl DapolConfig {
         .log_on_err()?;
 
         info!(
-            // STENT TODO you must post the root commitment too, and it also needs to get checked when doing inclusion proofs
+            // STENT TODO you must post the root commitment too, and it also needs to get checked
+            // when doing inclusion proofs
             "Successfully built DAPOL tree with root hash {:?}",
             dapol_tree.root_hash()
         );
@@ -490,7 +543,7 @@ mod tests {
             .clone()
     }
 
-    mod input_to_config {
+    mod creating_config {
         use super::*;
 
         #[test]
@@ -649,7 +702,8 @@ mod tests {
             );
         }
 
-        // STENT TODO add tests for secret parser failure: UnknownFileType, bad file, file not found
+        // STENT TODO add tests for secret parser failure: UnknownFileType, bad
+        // file, file not found
     }
 
     // STENT TODO these are actually integration tests, so move them to tests dir
