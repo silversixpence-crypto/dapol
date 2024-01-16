@@ -402,7 +402,7 @@ mod tests {
 
         let leaf_nodes = full_bottom_layer(&height);
 
-        let tree_single_threaded = TreeBuilder::new()
+        let tree_single_threaded = BinaryTreeBuilder::new()
             .with_height(height)
             .with_store_depth(MIN_STORE_DEPTH)
             .with_leaf_nodes(leaf_nodes.clone())
@@ -434,7 +434,7 @@ mod tests {
 
         let leaf_nodes = full_bottom_layer(&height);
 
-        let tree_multi_threaded = TreeBuilder::new()
+        let tree_multi_threaded = BinaryTreeBuilder::new()
             .with_height(height)
             .with_store_depth(MIN_STORE_DEPTH)
             .with_leaf_nodes(leaf_nodes.clone())
@@ -466,7 +466,7 @@ mod tests {
 
         let leaf_nodes = sparse_leaves(&height);
 
-        let tree_single_threaded = TreeBuilder::new()
+        let tree_single_threaded = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(MIN_STORE_DEPTH)
@@ -498,7 +498,7 @@ mod tests {
 
         let leaf_nodes = sparse_leaves(&height);
 
-        let tree_multi_threaded = TreeBuilder::new()
+        let tree_multi_threaded = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(MIN_STORE_DEPTH)
@@ -531,7 +531,7 @@ mod tests {
         for i in 0..height.max_bottom_layer_nodes() {
             let leaf_node = vec![single_leaf(i)];
 
-            let tree_single_threaded = TreeBuilder::new()
+            let tree_single_threaded = BinaryTreeBuilder::new()
                 .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(MIN_STORE_DEPTH)
@@ -565,7 +565,7 @@ mod tests {
         for x_coord in 0..height.max_bottom_layer_nodes() {
             let leaf_node = vec![single_leaf(x_coord)];
 
-            let tree_multi_threaded = TreeBuilder::new()
+            let tree_multi_threaded = BinaryTreeBuilder::new()
                 .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(MIN_STORE_DEPTH)

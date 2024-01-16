@@ -30,13 +30,13 @@ pub fn bytes_to_string(num_bytes: usize) -> String {
     if n < kb {
         format!("{} bytes", num_bytes)
     } else if n < mb {
-        format!("{} kB", n / kb)
+        format!("{:.3} kB", n as f64 / kb as f64)
     } else if n < gb {
-        format!("{:.2} MB", n as f64 / mb as f64)
+        format!("{:.3} MB", n as f64 / mb as f64)
     } else if n < tb {
-        format!("{:.2} GB", n as f64 / gb as f64)
+        format!("{:.3} GB", n as f64 / gb as f64)
     } else {
-        format!("{:.2} TB", n as f64 / tb as f64)
+        format!("{:.3} TB", n as f64 / tb as f64)
     }
 }
 

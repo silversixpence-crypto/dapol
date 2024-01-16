@@ -1,0 +1,1 @@
+Tree generator's singular secret value. This value is known only to the tree generator, and is used to determine all other secret values needed in the tree.

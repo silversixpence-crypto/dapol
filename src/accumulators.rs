@@ -1,192 +1,51 @@
 //! Various accumulator variants of the DAPOL+ protocol.
 //!
-//! This is the top-most module in the hierarchy of the [dapol] crate. An
-//! accumulator defines how the binary tree is built. There are different types
-//! of accumulators, which can all be found under this module. Each accumulator
-//! has different configuration requirements, which are detailed in each of the
-//! sub-modules. The currently supported accumulator types are:
-//! - [Non-Deterministic Mapping Sparse Merkle Tree]
-//!
-//! Accumulators can be constructed via the configuration parsers:
-//! - [AccumulatorConfig] is used to deserialize config from a file (the
-//! specific type of accumulator is determined from the config file). After
-//! parsing the config the accumulator can be constructed.
-//! - [NdmSmtConfigBuilder] is used to construct the
-//! config for the NDM-SMT accumulator type using a builder pattern. The config
-//! can then be parsed to construct an NDM-SMT.
-//!
-//! [Non-Deterministic Mapping Sparse Merkle Tree]: crate::accumulators::NdmSmt
+//! An accumulator defines how the binary tree is built. There are different
+//! types of accumulators, which can all be found under this module.
 
-use log::{debug, info};
+use clap::ValueEnum;
+use primitive_types::H256;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-
-use crate::{
-    read_write_utils::{self, ReadWriteError},
-    utils::LogOnErr,
-    AggregationFactor, EntityId, InclusionProof,
-};
-
-mod config;
-pub use config::{AccumulatorConfig, AccumulatorConfigError, AccumulatorParserError};
 
 mod ndm_smt;
-pub use ndm_smt::{
-    NdmSmt, NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtError, NdmSmtConfigParserError, NdmSmtSecrets,
-    NdmSmtSecretsParser, RandomXCoordGenerator
-};
+pub use ndm_smt::{NdmSmt, NdmSmtError, RandomXCoordGenerator};
 
-const SERIALIZED_ACCUMULATOR_EXTENSION: &str = "dapoltree";
-const SERIALIZED_ACCUMULATOR_FILE_PREFIX: &str = "accumulator_";
+use crate::Height;
 
-/// Various supported accumulator types.
-///
-/// Accumulators can be constructed via the configuration parsers:
-/// - [AccumulatorConfig] is used to deserialize config from a file (the
-/// specific type of accumulator is determined from the config file). After
-/// parsing the config the accumulator can be constructed.
-/// - [NdmSmtConfigBuilder] is used to construct the
-/// config for the NDM-SMT accumulator type using a builder pattern. The config
-/// can then be parsed to construct an NDM-SMT.
-#[derive(Serialize, Deserialize)]
+/// Supported accumulators, with their linked data.
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Accumulator {
     NdmSmt(ndm_smt::NdmSmt),
-    // TODO other accumulators..
+    // TODO add other accumulators..
 }
 
 impl Accumulator {
-    /// Try deserialize an accumulator from the given file path.
-    ///
-    /// The file is assumed to be in [bincode] format.
-    ///
-    /// An error is logged and returned if
-    /// 1. The file cannot be opened.
-    /// 2. The [bincode] deserializer fails.
-    pub fn deserialize(path: PathBuf) -> Result<Accumulator, AccumulatorError> {
-        debug!(
-            "Deserializing accumulator from file {:?}",
-            path.clone().into_os_string()
-        );
-
-        match path.extension() {
-            Some(ext) => {
-                if ext != SERIALIZED_ACCUMULATOR_EXTENSION {
-                    Err(ReadWriteError::UnsupportedFileExtension {
-                        expected: SERIALIZED_ACCUMULATOR_EXTENSION.to_owned(),
-                        actual: ext.to_os_string(),
-                    })?;
-                }
-            }
-            None => Err(ReadWriteError::NotAFile(path.clone().into_os_string()))?,
-        }
-
-        let accumulator: Accumulator =
-            read_write_utils::deserialize_from_bin_file(path.clone()).log_on_err()?;
-
-        let root_hash = match &accumulator {
-            Accumulator::NdmSmt(ndm_smt) => ndm_smt.root_hash(),
-        };
-
-        info!(
-            "Successfully deserialized accumulator from file {:?} with root hash {:?}",
-            path.clone().into_os_string(),
-            root_hash
-        );
-
-        Ok(accumulator)
-    }
-
-    /// Parse `path` as one that points to a serialized dapol tree file.
-    ///
-    /// `path` can be either of the following:
-    /// 1. Existing directory: in this case a default file name is appended to
-    /// `path`. 2. Non-existing directory: in this case all dirs in the path
-    /// are created, and a default file name is appended.
-    /// 3. File in existing dir: in this case the extension is checked to be
-    /// [SERIALIZED_ACCUMULATOR_EXTENSION], then `path` is returned.
-    /// 4. File in non-existing dir: dirs in the path are created and the file
-    /// extension is checked.
-    ///
-    /// The file prefix is [SERIALIZED_ACCUMULATOR_FILE_PREFIX].
-    ///
-    /// Example:
-    /// ```
-    /// use dapol::Accumulator;
-    /// use std::path::PathBuf;
-    ///
-    /// let dir = PathBuf::from("./");
-    /// let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
-    /// ```
-    pub fn parse_accumulator_serialization_path(path: PathBuf) -> Result<PathBuf, ReadWriteError> {
-        read_write_utils::parse_serialization_path(
-            path,
-            SERIALIZED_ACCUMULATOR_EXTENSION,
-            SERIALIZED_ACCUMULATOR_FILE_PREFIX,
-        )
-    }
-
-    /// Serialize to a file.
-    ///
-    /// Serialization is done using [bincode]
-    ///
-    /// An error is returned if
-    /// 1. [bincode] fails to serialize the file.
-    /// 2. There is an issue opening or writing the file.
-    pub fn serialize(&self, path: PathBuf) -> Result<(), AccumulatorError> {
-        info!(
-            "Serializing accumulator to file {:?}",
-            path.clone().into_os_string()
-        );
-
-        read_write_utils::serialize_to_bin_file(self, path).log_on_err()?;
-        Ok(())
-    }
-
-    /// Generate an inclusion proof for the given `entity_id`.
-    ///
-    /// `aggregation_factor` is used to determine how many of the range proofs
-    /// are aggregated. Those that do not form part of the aggregated proof
-    /// are just proved individually. The aggregation is a feature of the
-    /// Bulletproofs protocol that improves efficiency.
-    ///
-    /// `upper_bound_bit_length` is used to determine the upper bound for the
-    /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
-    /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
-    /// some liability. The type is set to `u8` because we are not expected
-    /// to require bounds higher than $2^256$. Note that if the value is set
-    /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
-    /// an Err.
-    pub fn generate_inclusion_proof_with(
-        &self,
-        entity_id: &EntityId,
-        aggregation_factor: AggregationFactor,
-        upper_bound_bit_length: u8,
-    ) -> Result<InclusionProof, NdmSmtError> {
+    /// Height of the binary tree.
+    pub fn height(&self) -> &Height {
         match self {
-            Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof_with(
-                entity_id,
-                aggregation_factor,
-                upper_bound_bit_length,
-            ),
+            Accumulator::NdmSmt(ndm_smt) => ndm_smt.height(),
         }
     }
 
-    /// Generate an inclusion proof for the given `entity_id`.
-    pub fn generate_inclusion_proof(
-        &self,
-        entity_id: &EntityId,
-    ) -> Result<InclusionProof, NdmSmtError> {
+    /// Return the accumulator type.
+    pub fn get_type(&self) -> AccumulatorType {
         match self {
-            Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof(entity_id),
+            Self::NdmSmt(_) => AccumulatorType::NdmSmt,
+        }
+    }
+
+    /// Return the hash digest/bytes of the root node for the binary tree.
+    pub fn root_hash(&self) -> H256 {
+        match self {
+            Self::NdmSmt(ndm_smt) => ndm_smt.root_hash(),
         }
     }
 }
 
-/// Errors encountered when handling an [Accumulator].
-#[derive(thiserror::Error, Debug)]
-pub enum AccumulatorError {
-    #[error("Error serializing/deserializing file")]
-    SerdeError(#[from] ReadWriteError),
+/// Various supported accumulator types.
+#[derive(Clone, Deserialize, Debug, ValueEnum, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AccumulatorType {
+    NdmSmt,
+    // TODO add other accumulators..
 }
-
-// NOTE no unit tests here because this code is tested in the integration tests.

@@ -1,9 +1,7 @@
 use std::convert::From;
-use std::str::FromStr;
 
-use serde::{Serialize, Deserialize};
-
-use crate::kdf::Key;
+use serde::Serialize;
+use serde_with::DeserializeFromStr;
 
 /// The max size of the secret is 256 bits, but this is a soft limit so it
 /// can be increased if necessary. Note that the underlying array length will
@@ -24,7 +22,7 @@ pub const MAX_LENGTH_BYTES: usize = 32;
 /// Currently there is no need for the functionality provided by something like
 /// [primitive_types][U256] or [num256][Uint256] but those are options for
 /// later need be.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, DeserializeFromStr)]
 pub struct Secret([u8; 32]);
 
 impl Secret {
@@ -33,12 +31,20 @@ impl Secret {
     }
 }
 
-impl From<Key> for Secret {
-    fn from(key: Key) -> Self {
+// -------------------------------------------------------------------------------------------------
+// From for KDF key.
+
+use crate::kdf;
+
+impl From<kdf::Key> for Secret {
+    fn from(key: kdf::Key) -> Self {
         let bytes: [u8; 32] = key.into();
         Secret(bytes)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// From for u64.
 
 impl From<u64> for Secret {
     /// Constructor that takes in a u64.
@@ -49,6 +55,11 @@ impl From<u64> for Secret {
         Secret(arr)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// From for str.
+
+use std::str::FromStr;
 
 impl FromStr for Secret {
     type Err = SecretParserError;
@@ -66,6 +77,9 @@ impl FromStr for Secret {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Into for raw bytes.
 
 impl From<Secret> for [u8; 32] {
     fn from(item: Secret) -> Self {

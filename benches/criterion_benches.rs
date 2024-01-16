@@ -8,14 +8,14 @@
 //! long (see large_input_benches.rs).
 
 use std::path::Path;
+use std::str::FromStr;
 
 use criterion::measurement::Measurement;
 use criterion::{criterion_group, criterion_main};
 use criterion::{BenchmarkId, Criterion, SamplingMode};
 use statistical::*;
 
-use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
-use dapol::{Accumulator, InclusionProof};
+use dapol::{DapolConfigBuilder, DapolTree, InclusionProof, Secret};
 
 mod inputs;
 use inputs::{max_thread_counts_greater_than, num_entities_in_range, tree_heights_in_range};
@@ -42,6 +42,8 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
     let epoch = jemalloc_ctl::epoch::mib().unwrap();
     let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
+
+    let master_secret = Secret::from_str("secret").unwrap();
 
     dapol::initialize_machine_parallelism();
     dapol::utils::activate_logging(*LOG_VERBOSITY);
@@ -103,7 +105,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 // Tree build.
 
                 let mut memory_readings = vec![];
-                let mut ndm_smt = Option::<NdmSmt>::None;
+                let mut dapol_tree = Option::<DapolTree>::None;
 
                 group.bench_with_input(
                     BenchmarkId::new(
@@ -119,17 +121,20 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                     |bench, tup| {
                         bench.iter(|| {
                             // this is necessary for the memory readings to work
-                            ndm_smt = None;
+                            dapol_tree = None;
 
                             epoch.advance().unwrap();
                             let before = allocated.read().unwrap();
 
-                            ndm_smt = Some(
-                                NdmSmtConfigBuilder::default()
+                            dapol_tree = Some(
+                                DapolConfigBuilder::default()
+                                    .accumulator_type(dapol::AccumulatorType::NdmSmt)
                                     .height(tup.0)
                                     .max_thread_count(tup.1)
                                     .num_random_entities(tup.2)
+                                    .master_secret(master_secret.clone())
                                     .build()
+                                    .expect("Unable to build DapolConfig")
                                     .parse()
                                     .expect("Unable to parse NdmSmtConfig"),
                             );
@@ -160,8 +165,8 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 let src_dir = env!("CARGO_MANIFEST_DIR");
                 let target_dir = Path::new(&src_dir).join("target");
                 let dir = target_dir.join("serialized_trees");
-                let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
-                let acc = Accumulator::NdmSmt(ndm_smt.expect("Tree should have been built"));
+                let path = DapolTree::parse_serialization_path(dir).unwrap();
+                let tree = dapol_tree.expect("Tree should have been built");
 
                 group.bench_function(
                     BenchmarkId::new(
@@ -174,7 +179,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                         ),
                     ),
                     |bench| {
-                        bench.iter(|| acc.serialize(path.clone()).unwrap());
+                        bench.iter(|| tree.serialize(path.clone()).unwrap());
                     },
                 );
 
@@ -195,6 +200,11 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 /// generation to have maximum threads.
 pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
     let mut group = c.benchmark_group("proofs");
+
+    let master_secret = Secret::from_str("secret").unwrap();
+
+    dapol::initialize_machine_parallelism();
+    dapol::utils::activate_logging(*LOG_VERBOSITY);
 
     for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
         for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
@@ -238,15 +248,19 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
                 continue;
             }
 
-            let ndm_smt = NdmSmtConfigBuilder::default()
+            let dapol_tree = DapolConfigBuilder::default()
+                .accumulator_type(dapol::AccumulatorType::NdmSmt)
+                .master_secret(master_secret.clone())
                 .height(h)
                 .num_random_entities(n)
                 .build()
+                .expect("Unable to build DapolConfig")
                 .parse()
                 .expect("Unable to parse NdmSmtConfig");
 
-            let entity_id = ndm_smt
+            let entity_id = dapol_tree
                 .entity_mapping()
+                .unwrap()
                 .keys()
                 .next()
                 .expect("Tree should have at least 1 entity");
@@ -261,7 +275,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
                 |bench| {
                     bench.iter(|| {
                         proof = Some(
-                            ndm_smt
+                            dapol_tree
                                 .generate_inclusion_proof(entity_id)
                                 .expect("Proof should have been generated successfully"),
                         );
@@ -296,6 +310,11 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
     let mut group = c.benchmark_group("proofs");
 
+    let master_secret = Secret::from_str("secret").unwrap();
+
+    dapol::initialize_machine_parallelism();
+    dapol::utils::activate_logging(*LOG_VERBOSITY);
+
     for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
         for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
             {
@@ -338,22 +357,26 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
                 continue;
             }
 
-            let ndm_smt = NdmSmtConfigBuilder::default()
+            let dapol_tree = DapolConfigBuilder::default()
+                .accumulator_type(dapol::AccumulatorType::NdmSmt)
+                .master_secret(master_secret.clone())
                 .height(h)
                 .num_random_entities(n)
                 .build()
+                .expect("Unable to build DapolConfig")
                 .parse()
                 .expect("Unable to parse NdmSmtConfig");
 
-            let root_hash = ndm_smt.root_hash();
+            let root_hash = dapol_tree.root_hash();
 
-            let entity_id = ndm_smt
+            let entity_id = dapol_tree
                 .entity_mapping()
+                .unwrap()
                 .keys()
                 .next()
                 .expect("Tree should have at least 1 entity");
 
-            let proof = ndm_smt
+            let proof = dapol_tree
                 .generate_inclusion_proof(entity_id)
                 .expect("Proof should have been generated successfully");
 

@@ -146,7 +146,7 @@ impl FromStr for Height {
 }
 
 // -------------------------------------------------------------------------------------------------
-// From for OsStr.
+// From for OsStr (for the CLI).
 
 use clap::builder::{OsStr, Str};
 

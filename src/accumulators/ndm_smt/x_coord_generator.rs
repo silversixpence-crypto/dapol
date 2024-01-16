@@ -18,8 +18,8 @@ use std::collections::HashMap;
 /// - `i` is used to track the current position of the algorithm.
 ///
 /// Example:
-/// ```
-/// use dapol::accumulators::RandomXCoordGenerator;
+/// ```rust,ignore
+/// use crate::accumulators::RandomXCoordGenerator;
 ///
 /// let height = dapol::Height::default();
 /// let mut x_coord_generator = RandomXCoordGenerator::new(&height);

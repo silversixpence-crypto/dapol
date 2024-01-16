@@ -1,14 +1,13 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use clap::Parser;
 use log::debug;
 
 use dapol::{
-    accumulators::NdmSmtConfigBuilder,
-    cli::{AccumulatorType, BuildKindCommand, Cli, Command},
+    cli::{BuildKindCommand, Cli, Command},
     initialize_machine_parallelism,
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr, LogOnErrUnwrap},
-    Accumulator, AccumulatorConfig, AggregationFactor, EntityIdsParser, InclusionProof,
+    AggregationFactor, DapolConfig, DapolConfigBuilder, DapolTree, EntityIdsParser, InclusionProof,
 };
 use patharg::InputArg;
 
@@ -25,6 +24,8 @@ fn main() {
         } => {
             initialize_machine_parallelism();
 
+            // It's not necessary to do this first, but it allows fast-failure
+            // for bad paths.
             let serialization_path =
                 // Do not try serialize if the command is Deserialize because
                 // this means there already is a serialized file.
@@ -34,7 +35,7 @@ fn main() {
                     match serialize {
                         Some(patharg) => {
                             let path = patharg.into_path().expect("Expected a file path, not stdout");
-                            Accumulator::parse_accumulator_serialization_path(path).log_on_err().ok()
+                            DapolTree::parse_serialization_path(path).log_on_err().ok()
                         }
                         None => None,
                     }
@@ -42,35 +43,37 @@ fn main() {
                     None
                 };
 
-            let accumulator: Accumulator = match build_kind {
+            let dapol_tree: DapolTree = match build_kind {
                 BuildKindCommand::New {
-                    accumulator,
+                    accumulator_type,
+                    salt_b,
+                    salt_s,
                     height,
+                    max_liability,
                     max_thread_count,
                     secrets_file,
                     entity_source,
-                } => match accumulator {
-                    AccumulatorType::NdmSmt => {
-                        let ndm_smt = NdmSmtConfigBuilder::default()
-                            .height(height)
-                            .max_thread_count(max_thread_count)
-                            .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
-                            .entities_path_opt(
-                                entity_source.entities_file.and_then(|arg| arg.into_path()),
-                            )
-                            .num_random_entities_opt(entity_source.random_entities)
-                            .build()
-                            .parse()
-                            .log_on_err_unwrap();
-
-                        Accumulator::NdmSmt(ndm_smt)
-                    }
-                },
-                BuildKindCommand::Deserialize { path } => Accumulator::deserialize(
+                } => DapolConfigBuilder::default()
+                    .accumulator_type(accumulator_type)
+                    .salt_b_opt(salt_b)
+                    .salt_s_opt(salt_s)
+                    .max_liability(max_liability)
+                    .height(height)
+                    .max_thread_count(max_thread_count)
+                    .entities_file_path_opt(
+                        entity_source.entities_file.and_then(|arg| arg.into_path()),
+                    )
+                    .num_random_entities_opt(entity_source.random_entities)
+                    .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
+                    .build()
+                    .log_on_err_unwrap()
+                    .parse()
+                    .log_on_err_unwrap(),
+                BuildKindCommand::Deserialize { path } => DapolTree::deserialize(
                     path.into_path().expect("Expected file path, not stdout"),
                 )
                 .log_on_err_unwrap(),
-                BuildKindCommand::ConfigFile { file_path } => AccumulatorConfig::deserialize(
+                BuildKindCommand::ConfigFile { file_path } => DapolConfig::deserialize(
                     file_path
                         .into_path()
                         .expect("Expected file path, not stdin"),
@@ -84,7 +87,7 @@ fn main() {
                 .if_none_then(|| {
                     debug!("No serialization path set, skipping serialization of the tree");
                 })
-                .consume(|path| accumulator.serialize(path).unwrap());
+                .consume(|path| dapol_tree.serialize(path).unwrap());
 
             if let Some(patharg) = gen_proofs {
                 let entity_ids = EntityIdsParser::from(
@@ -97,7 +100,7 @@ fn main() {
                 std::fs::create_dir(dir.as_path()).log_on_err_unwrap();
 
                 for entity_id in entity_ids {
-                    let proof = accumulator
+                    let proof = dapol_tree
                         .generate_inclusion_proof(&entity_id)
                         .log_on_err_unwrap();
 
@@ -109,9 +112,8 @@ fn main() {
             entity_ids,
             tree_file,
             range_proof_aggregation,
-            upper_bound_bit_length,
         } => {
-            let accumulator = Accumulator::deserialize(
+            let dapol_tree = DapolTree::deserialize(
                 tree_file
                     .into_path()
                     .expect("Expected file path, not stdout"),
@@ -133,11 +135,10 @@ fn main() {
             let aggregation_factor = AggregationFactor::Percent(range_proof_aggregation);
 
             for entity_id in entity_ids {
-                let proof = accumulator
+                let proof = dapol_tree
                     .generate_inclusion_proof_with(
                         &entity_id,
                         aggregation_factor.clone(),
-                        upper_bound_bit_length,
                     )
                     .log_on_err_unwrap();
 

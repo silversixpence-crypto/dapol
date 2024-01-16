@@ -9,8 +9,7 @@ pub const DEFAULT_MAX_THREAD_COUNT: u8 = 4;
 
 /// Abstraction for the max number of threads.
 ///
-/// This struct is used when determining how many threads can be spawned when
-/// doing work in parallel.
+#[doc = include_str!("./shared_docs/max_thread_count.md")]
 ///
 /// Example:
 /// ```
@@ -29,6 +28,9 @@ impl MaxThreadCount {
         self.0
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// From for u8
 
 impl From<u8> for MaxThreadCount {
     fn from(max_thread_count: u8) -> Self {
@@ -68,7 +70,7 @@ impl FromStr for MaxThreadCount {
 }
 
 // -------------------------------------------------------------------------------------------------
-// From for OsStr.
+// Into for OsStr.
 
 use clap::builder::{OsStr, Str};
 

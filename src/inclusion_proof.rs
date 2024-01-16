@@ -6,7 +6,7 @@ use std::{fmt::Debug, path::PathBuf};
 use log::info;
 
 use crate::binary_tree::{Coordinate, Height, Node, PathSiblings};
-use crate::node_content::{FullNodeContent, HiddenNodeContent};
+use crate::binary_tree::{FullNodeContent, HiddenNodeContent};
 use crate::{read_write_utils, EntityId};
 
 mod individual_range_proof;
@@ -17,11 +17,6 @@ use aggregated_range_proof::AggregatedRangeProof;
 
 mod aggregation_factor;
 pub use aggregation_factor::AggregationFactor;
-
-/// Default upper bound for the range proof in the inclusion proof.
-/// 64 bits should be more than enough bits to represent liabilities for real
-/// world applications such as crypto asset exchange balances.
-pub const DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH: u8 = 64u8;
 
 /// The file extension used when writing serialized binary files.
 const SERIALIZED_PROOF_EXTENSION: &str = "dapolproof";

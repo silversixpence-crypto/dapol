@@ -2,7 +2,7 @@
 //!
 //! See [MAIN_LONG_ABOUT] for more information.
 
-use clap::{command, Args, Parser, Subcommand, ValueEnum};
+use clap::{command, Args, Parser, Subcommand};
 use clap_verbosity_flag::{Verbosity, WarnLevel};
 use patharg::{InputArg, OutputArg};
 use primitive_types::H256;
@@ -10,9 +10,10 @@ use primitive_types::H256;
 use std::str::FromStr;
 
 use crate::{
+    accumulators::AccumulatorType,
     binary_tree::Height,
-    inclusion_proof::DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
-    percentage::{Percentage, ONE_HUNDRED_PERCENT}, MaxThreadCount,
+    percentage::{Percentage, ONE_HUNDRED_PERCENT},
+    MaxLiability, MaxThreadCount, Salt
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -44,7 +45,7 @@ pub enum Command {
     /// Inclusion proofs can be generated, but configuration is not supported.
     /// If you want more config options then use the `gen-proofs` command.
     BuildTree {
-        /// Choose the accumulator type for the tree.
+        /// Config DAPOL tree.
         #[command(subcommand)]
         build_kind: BuildKindCommand,
 
@@ -81,10 +82,6 @@ pub enum Command {
         /// are aggregated using the Bulletproofs protocol.
         #[arg(short, long, value_parser = Percentage::from_str, default_value = ONE_HUNDRED_PERCENT, value_name = "PERCENTAGE")]
         range_proof_aggregation: Percentage,
-
-        /// Upper bound for the range proofs is 2^(this_number).
-        #[arg(short, long, default_value_t = DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH, value_name = "U8_INT")]
-        upper_bound_bit_length: u8,
     },
 
     /// Verify an inclusion proof.
@@ -109,19 +106,25 @@ pub enum BuildKindCommand {
     /// supported by the configuration file format which can be found in the
     ///`build-tree config-file` command.";
     New {
-        /// Choose an accumulator type for the tree.
-        #[arg(short, long, value_enum)]
-        accumulator: AccumulatorType,
+        #[arg(short, long, value_enum, help = include_str!("./shared_docs/accumulator_type.md"))]
+        accumulator_type: AccumulatorType,
 
-        /// Height to use for the binary tree.
-        #[arg(long, value_parser = Height::from_str, default_value = Height::default(), value_name = "U8_INT")]
+        #[arg(long, value_parser = Salt::from_str, help = include_str!("./shared_docs/salt_b.md"))]
+        salt_b: Option<Salt>,
+
+        #[arg(long, value_parser = Salt::from_str, help = include_str!("./shared_docs/salt_s.md"))]
+        salt_s: Option<Salt>,
+
+        #[arg(long, value_parser = Height::from_str, default_value = Height::default(), value_name = "U8_INT", help = include_str!("./shared_docs/height.md"))]
         height: Height,
 
-        /// Max thread count allowed for parallel tree builder.
-        #[arg(long, value_parser = MaxThreadCount::from_str, default_value = MaxThreadCount::default(), value_name = "U8_INT")]
+        #[arg(long, value_parser = MaxLiability::from_str, default_value = MaxLiability::default(), value_name = "U64_INT", help = include_str!("./shared_docs/max_liability.md"))]
+        max_liability: MaxLiability,
+
+        #[arg(long, value_parser = MaxThreadCount::from_str, default_value = MaxThreadCount::default(), value_name = "U8_INT", help = include_str!("./shared_docs/max_thread_count.md"))]
         max_thread_count: MaxThreadCount,
 
-        #[arg(short, long, value_name = "FILE_PATH", long_help = NDM_SMT_SECRETS_HELP)]
+        #[arg(short, long, value_name = "FILE_PATH", long_help = SECRETS_HELP)]
         secrets_file: Option<InputArg>,
 
         #[command(flatten)]
@@ -136,12 +139,6 @@ pub enum BuildKindCommand {
 
     /// Deserialize a tree from a .dapoltree file.
     Deserialize { path: InputArg },
-}
-
-#[derive(ValueEnum, Debug, Clone)]
-pub enum AccumulatorType {
-    NdmSmt,
-    // TODO other accumulators..
 }
 
 #[derive(Args, Debug)]
@@ -187,12 +184,10 @@ overwritten (if it exists) or created (if it does not exist). The file
 extension must be `.dapoltree`. The serialization option is ignored if
 `build-tree deserialize` command is used.";
 
-const NDM_SMT_SECRETS_HELP: &str = "
+const SECRETS_HELP: &str = "
 TOML file containing secrets. The file format is as follows:
 ```
 master_secret = \"master_secret\"
-salt_b = \"salt_b\"
-salt_s = \"salt_s\"
 ```
 All secrets should have at least 128-bit security, but need not be chosen from a
 uniform distribution as they are passed through a key derivation function before
@@ -206,37 +201,17 @@ CSV file format:
 entity_id,liability";
 
 const COMMAND_CONFIG_FILE_ABOUT: &str =
-    "Read accumulator type and other tree configuration from a file. Supported file formats: TOML.";
+    "Read tree configuration from a file. Supported file formats: TOML.";
 
-const COMMAND_CONFIG_FILE_LONG_ABOUT: &str = "
-Read accumulator type and other tree configuration from a file.
+const COMMAND_CONFIG_FILE_LONG_ABOUT: &str = concat!(
+    "
+Read tree configuration from a file.
 Supported file formats: TOML.
 
 Config file format (TOML):
 ```
-# Accumulator type of the tree.
-# This value determines what other values are required.
-accumulator_type = \"ndm-smt\"
-
-# Height of the tree.
-# If the height is not set the default height will be used.
-height = 16
-
-# Path to the secrets file.
-# If not present the secrets will be generated randomly.
-secrets_file_path = \"./examples/ndm_smt_secrets_example.toml\"
-
-# Can be a file or directory (default file name given in this case)
-# If not present then no serialization is done.
-serialization_path = \"./tree.dapoltree\"
-
-# At least one of file_path & generate_random must be present.
-# If both are given then file_path is prioritized.
-[entities]
-
-# Path to a file containing a list of entity IDs and their liabilities.
-file_path = \"./examples/entities_example.csv\"
-
-# Generate the given number of entities, with random IDs & liabilities.
-generate_random = 4
-```";
+",
+    include_str!("../examples/dapol_config_example.toml"),
+    "
+```"
+);
