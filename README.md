@@ -114,6 +114,20 @@ The proof generation command only offers 1 way to inject the tree (deserializati
 
 The root hash is logged out at info level when the tree is built or deserialized.
 
+## Unit test fuzzing
+
+Follow the steps in the [Rust Fuzz Book](https://rust-fuzz.github.io/book/introduction.html) to get started. Essentially:
+```bash
+# The cargo-fuzz / libfuzzer duo is used
+cargo install cargo-fuzz
+
+# Need nightly for cargo-fuzz
+rustup default nightly
+
+# Run the max_nodes_to_store block, and don't do more than 300k runs.
+cargo fuzz run max_nodes_to_store -- -runs=300000
+```
+
 ## Benchmarks
 
 To run the benchmarks first clone the repo and then run:
@@ -141,18 +155,10 @@ A set of tuples is used as input to the benches:
 
 You may experience an error building the benches if you are on a fresh Linux machine. If the jemalloc-sys package fails to build then maybe [this](https://github.com/tikv/jemallocator/issues/29) will help.
 
-## Unit test fuzzing
-
-Follow the steps in the [Rust Fuzz Book](https://rust-fuzz.github.io/book/introduction.html) to get started. Essentially:
-```bash
-# The cargo-fuzz / libfuzzer duo is used
-cargo install cargo-fuzz
-
-# Need nightly for cargo-fuzz
-rustup default nightly
-
-# Run the max_nodes_to_store block, and don't do more than 300k runs.
-cargo fuzz run max_nodes_to_store -- -runs=300000
-```
-
+![](resources/build_time_large.png)
+![](resources/build_time_small.png)
+![](resources/mem_usage_large.png)
+![](resources/mem_usage_small.png)
+![](resources/proof_generation_time.png)
+![](resources/proof_size.png)
 
