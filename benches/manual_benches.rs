@@ -6,11 +6,12 @@
 //! unfortunately, but this is the trade-off.
 
 use std::path::Path;
+use std::str::FromStr;
 use std::time::Instant;
 
 use statistical::*;
 
-use dapol::accumulators::{Accumulator, NdmSmt, NdmSmtConfigBuilder};
+use dapol::{DapolConfigBuilder, DapolTree, Secret};
 
 mod inputs;
 use inputs::{max_thread_counts_greater_than, num_entities_in_range, tree_heights_in_range};
@@ -35,6 +36,8 @@ fn main() {
     let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
 
     let total_mem = system_total_memory_mb();
+
+    let master_secret = Secret::from_str("secret").unwrap();
 
     dapol::initialize_machine_parallelism();
     dapol::utils::activate_logging(*LOG_VERBOSITY);
@@ -100,14 +103,14 @@ fn main() {
                 // ==============================================================
                 // Tree build.
 
-                let mut ndm_smt = Option::<NdmSmt>::None;
+                let mut dapol_tree = Option::<DapolTree>::None;
                 let mut memory_readings = vec![];
                 let mut timings = vec![];
 
                 // Do 3 readings (Criterion does 10 minimum).
                 for _i in 0..3 {
                     // this is necessary for the memory readings to work
-                    ndm_smt = None;
+                    dapol_tree = None;
 
                     println!(
                         "building tree i {} time {}",
@@ -119,14 +122,17 @@ fn main() {
                     let mem_before = allocated.read().unwrap();
                     let time_start = Instant::now();
 
-                    ndm_smt = Some(
-                        NdmSmtConfigBuilder::default()
+                    dapol_tree = Some(
+                        DapolConfigBuilder::default()
+                            .accumulator_type(dapol::AccumulatorType::NdmSmt)
                             .height(h)
                             .max_thread_count(t)
+                            .master_secret(master_secret.clone())
                             .num_random_entities(n)
                             .build()
+                            .expect("Unable to build DapolConfig")
                             .parse()
-                            .expect("Unable to parse NdmSmtConfig"),
+                            .expect("Unable to parse DapolConfig"),
                     );
 
                     let tree_build_time = time_start.elapsed();
@@ -154,12 +160,13 @@ fn main() {
                 let src_dir = env!("CARGO_MANIFEST_DIR");
                 let target_dir = Path::new(&src_dir).join("target");
                 let dir = target_dir.join("serialized_trees");
-                let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
-                let acc =
-                    Accumulator::NdmSmt(ndm_smt.expect("NDM SMT should have been set in loop"));
+                let path = DapolTree::parse_serialization_path(dir).unwrap();
 
                 let time_start = Instant::now();
-                acc.serialize(path.clone()).unwrap();
+                dapol_tree
+                    .expect("DapolTree should have been set in loop")
+                    .serialize(path.clone())
+                    .unwrap();
                 let serialization_time = time_start.elapsed();
 
                 let file_size = std::fs::metadata(path)
