@@ -13,7 +13,7 @@ use crate::{
     accumulators::AccumulatorType,
     binary_tree::Height,
     percentage::{Percentage, ONE_HUNDRED_PERCENT},
-    MaxLiability, MaxThreadCount, Salt, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
+    MaxLiability, MaxThreadCount, Salt
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -82,10 +82,6 @@ pub enum Command {
         /// are aggregated using the Bulletproofs protocol.
         #[arg(short, long, value_parser = Percentage::from_str, default_value = ONE_HUNDRED_PERCENT, value_name = "PERCENTAGE")]
         range_proof_aggregation: Percentage,
-
-        /// Upper bound for the range proofs is 2^(this_number).
-        #[arg(short, long, default_value_t = DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH, value_name = "U8_INT")]
-        upper_bound_bit_length: u8,
     },
 
     /// Verify an inclusion proof.

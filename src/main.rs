@@ -112,7 +112,6 @@ fn main() {
             entity_ids,
             tree_file,
             range_proof_aggregation,
-            upper_bound_bit_length,
         } => {
             let dapol_tree = DapolTree::deserialize(
                 tree_file
@@ -140,7 +139,6 @@ fn main() {
                     .generate_inclusion_proof_with(
                         &entity_id,
                         aggregation_factor.clone(),
-                        upper_bound_bit_length,
                     )
                     .log_on_err_unwrap();
 

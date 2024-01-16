@@ -55,9 +55,9 @@
 
 mod kdf;
 
-pub mod read_write_utils;
 pub mod cli;
 pub mod percentage;
+pub mod read_write_utils;
 pub mod utils;
 
 mod dapol_tree;
@@ -69,7 +69,7 @@ pub use dapol_config::{
 };
 
 mod accumulators;
-pub use accumulators::{AccumulatorType, Accumulator};
+pub use accumulators::AccumulatorType;
 
 mod salt;
 pub use salt::Salt;

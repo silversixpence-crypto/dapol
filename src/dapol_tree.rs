@@ -7,7 +7,8 @@ use crate::{
     accumulators::{Accumulator, AccumulatorType, NdmSmt, NdmSmtError},
     read_write_utils::{self, ReadWriteError},
     utils::LogOnErr,
-    AggregationFactor, Entity, EntityId, Height, InclusionProof, MaxThreadCount, Salt, Secret, MaxLiability,
+    AggregationFactor, Entity, EntityId, Height, InclusionProof, MaxLiability, MaxThreadCount,
+    Salt, Secret,
 };
 
 const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
@@ -16,15 +17,10 @@ const SERIALIZED_TREE_FILE_PREFIX: &str = "proof_of_liabilities_merkle_sum_tree_
 /// Proof of Liabilities Sparse Merkle Sum Tree.
 ///
 /// This is the top-most module in the hierarchy of the [dapol] crate.
-// STENT TODO this doc stuff needs to change
-/// Trees can be constructed via the configuration parsers:
-/// - [AccumulatorConfig] is used to deserialize config from a file (the
-/// specific type of accumulator is determined from the config file). After
-/// parsing the config the accumulator can be constructed.
-/// - [NdmSmtConfigBuilder] is used to construct the
-/// config for the NDM-SMT accumulator type using a builder pattern. The config
-/// can then be parsed to construct an NDM-SMT.
-// STENT TODO give example usage
+///
+/// It is recommended that one use [crate][DapolConfig] to construct the
+/// tree, which has extra sanity checks on the inputs and more ways to set
+/// the parameters. But there is also a `new` function for direct construction.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DapolTree {
     accumulator: Accumulator,
@@ -39,6 +35,10 @@ pub struct DapolTree {
 
 impl DapolTree {
     /// Construct a new tree.
+    ///
+    /// It is recommended to rather use [crate][DapolConfig] to construct the
+    /// tree, which has extra sanity checks on the inputs and more ways to set
+    /// the parameters.
     ///
     /// An error is returned if the underlying accumulator type construction
     /// fails.
@@ -65,8 +65,41 @@ impl DapolTree {
     /// - `entities`:
     #[doc = include_str!("./shared_docs/entities_vector.md")]
     ///
+    /// Example of how to use the construtor:
+    /// ```
+    /// use std::str::FromStr;
+    /// use dapol::{
+    ///     AccumulatorType, DapolTree, Entity, EntityId, Height, MaxLiability,
+    ///     MaxThreadCount, Salt, Secret,
+    /// };
+    ///
+    /// let accumulator_type = AccumulatorType::NdmSmt;
+    /// let height = Height::expect_from(8);
+    /// let salt_b = Salt::from_str("salt_b").unwrap();
+    /// let salt_s = Salt::from_str("salt_s").unwrap();
+    /// let master_secret = Secret::from_str("master_secret").unwrap();
+    /// let max_liability = MaxLiability::from(10_000_000);
+    /// let max_thread_count = MaxThreadCount::from(8);
+    ///
+    /// let entity = Entity {
+    ///     liability: 1u64,
+    ///     id: EntityId::from_str("id").unwrap(),
+    /// };
+    /// let entities = vec![entity];
+    ///
+    /// let dapol_tree = DapolTree::new(
+    ///     accumulator_type,
+    ///     master_secret,
+    ///     salt_b,
+    ///     salt_s,
+    ///     max_liability,
+    ///     max_thread_count,
+    ///     height,
+    ///     entities,
+    /// ).unwrap();
+    /// ```
+    ///
     /// [default height]: crate::Height::default
-    // STENT TODO give example
     pub fn new(
         accumulator_type: AccumulatorType,
         master_secret: Secret,
@@ -106,20 +139,10 @@ impl DapolTree {
     /// are aggregated. Those that do not form part of the aggregated proof
     /// are just proved individually. The aggregation is a feature of the
     /// Bulletproofs protocol that improves efficiency.
-    ///
-    /// `upper_bound_bit_length` is used to determine the upper bound for the
-    /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
-    /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
-    /// some liability. The type is set to `u8` because we are not expected
-    /// to require bounds higher than $2^256$. Note that if the value is set
-    /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
-    /// an Err.
-    // STENT TODO use the max_liability value to calculate upper_bound_bit_length
     pub fn generate_inclusion_proof_with(
         &self,
         entity_id: &EntityId,
         aggregation_factor: AggregationFactor,
-        upper_bound_bit_length: u8,
     ) -> Result<InclusionProof, NdmSmtError> {
         match &self.accumulator {
             Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof_with(
@@ -128,7 +151,7 @@ impl DapolTree {
                 &self.salt_s,
                 entity_id,
                 aggregation_factor,
-                upper_bound_bit_length,
+                self.max_liability.as_range_proof_upper_bound_bit_length(),
             ),
         }
     }
@@ -183,9 +206,15 @@ impl DapolTree {
         self.accumulator.height()
     }
 
-    /// Get the underlying data associated with the accumulator.
-    pub fn accumultor(&self) -> &Accumulator {
-        &self.accumulator
+    /// Mapping of [crate][EntityId] to x-coord on the bottom layer of the tree.
+    ///
+    /// If the underlying accumulator is an NDM-SMT then a hashmap is returned
+    /// otherwise None is returned.
+    pub fn entity_mapping(&self) -> Option<&std::collections::HashMap<EntityId, u64>> {
+        match &self.accumulator {
+            Accumulator::NdmSmt(ndm_smt) => Some(ndm_smt.entity_mapping()),
+            _ => None,
+        }
     }
 
     /// Return the hash digest/bytes of the root node for the binary tree.

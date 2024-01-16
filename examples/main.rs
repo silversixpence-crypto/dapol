@@ -32,16 +32,17 @@ fn main() {
     // are mapped randomly to points on the bottom layer for NDM-SMT, but the
     // entity mapping of one tree should simply be a permutation of the other.
     // Let's check this:
-    match (dapol_tree_1.accumultor(), dapol_tree_2.accumultor()) {
-        (dapol::Accumulator::NdmSmt(ndm_smt_1), dapol::Accumulator::NdmSmt(ndm_smt_2)) => {
-            assert_ne!(ndm_smt_1.root_hash(), ndm_smt_2.root_hash());
-
-            for (entity, _) in ndm_smt_1.entity_mapping() {
-                assert!(ndm_smt_2.entity_mapping().contains_key(&entity));
+    match (dapol_tree_1.entity_mapping(), dapol_tree_2.entity_mapping()) {
+        (Some(entity_mapping_1), Some(entity_mapping_2)) => {
+            for (entity, _) in entity_mapping_1 {
+                assert!(entity_mapping_2.contains_key(&entity));
             }
         }
         _ => panic!("Expected both trees to be NDM-SMT"),
     };
+
+    // Since the mappings are not the same the root hashes won't be either.
+    assert_ne!(dapol_tree_1.root_hash(), dapol_tree_2.root_hash());
 
     // =========================================================================
     // Inclusion proof generation & verification.
@@ -141,13 +142,8 @@ pub fn advanced_inclusion_proof_generation_and_verification(
     let aggregation_factor = dapol::AggregationFactor::Percent(aggregation_percentage);
     let aggregation_factor = dapol::AggregationFactor::default();
 
-    // 2^upper_bound_bit_length is the upper bound used in the range proof i.e.
-    // the secret value is shown to reside in the range [0, 2^upper_bound_bit_length].
-    let upper_bound_bit_length = 32u8;
-    let upper_bound_bit_length = dapol::DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH;
-
     let inclusion_proof = dapol_tree
-        .generate_inclusion_proof_with(&entity_id, aggregation_factor, upper_bound_bit_length)
+        .generate_inclusion_proof_with(&entity_id, aggregation_factor)
         .unwrap();
 
     inclusion_proof.verify(dapol_tree.root_hash()).unwrap();

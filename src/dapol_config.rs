@@ -67,39 +67,7 @@ use crate::{salt, secret};
 /// ```
 ///
 /// Note that you can also construct a [crate][DapolTree] by calling the
-/// constructor directly:
-/// ```
-/// use std::str::FromStr;
-/// use dapol::{
-///     AccumulatorType, DapolTree, Entity, EntityId, Height, MaxLiability,
-///     MaxThreadCount, Salt, Secret,
-/// };
-///
-/// let accumulator_type = AccumulatorType::NdmSmt;
-/// let height = Height::expect_from(8);
-/// let salt_b = Salt::from_str("salt_b").unwrap();
-/// let salt_s = Salt::from_str("salt_s").unwrap();
-/// let master_secret = Secret::from_str("master_secret").unwrap();
-/// let max_liability = MaxLiability::from(10_000_000);
-/// let max_thread_count = MaxThreadCount::from(8);
-///
-/// let entity = Entity {
-///     liability: 1u64,
-///     id: EntityId::from_str("id").unwrap(),
-/// };
-/// let entities = vec![entity];
-///
-/// let dapol_tree = DapolTree::new(
-///     accumulator_type,
-///     master_secret,
-///     salt_b,
-///     salt_s,
-///     max_liability,
-///     max_thread_count,
-///     height,
-///     entities,
-/// ).unwrap();
-/// ```
+/// constructor directly (see [crate][DapolTree]).
 #[derive(Deserialize, Debug, Builder, PartialEq)]
 #[builder(build_fn(skip))]
 pub struct DapolConfig {
@@ -383,8 +351,6 @@ impl DapolConfig {
         .log_on_err()?;
 
         info!(
-            // STENT TODO you must post the root commitment too, and it also needs to get checked
-            // when doing inclusion proofs
             "Successfully built DAPOL tree with root hash {:?}",
             dapol_tree.root_hash()
         );
@@ -680,7 +646,7 @@ mod tests {
         }
 
         #[test]
-        fn unsupproted_secrets_file_type_fails_when_parsed() {
+        fn fail_when_unsupproted_secrets_file_type() {
             let this_file = std::file!();
             let unsupported_path = PathBuf::from(this_file);
 
@@ -702,11 +668,30 @@ mod tests {
             );
         }
 
-        // STENT TODO add tests for secret parser failure: UnknownFileType, bad
-        // file, file not found
+        #[test]
+        fn fail_when_unknown_secrets_file_type() {
+            let no_file_path = PathBuf::from("../LICENSE");
+
+            let num_entities = 100u64;
+
+            let res = DapolConfigBuilder::default()
+                .accumulator_type(AccumulatorType::NdmSmt)
+                .num_random_entities(num_entities)
+                .secrets_file_path(no_file_path)
+                .build()
+                .unwrap()
+                .parse();
+
+            assert_err!(
+                res,
+                Err(DapolConfigError::MasterSecretFileParseError(
+                    SecretsParserError::UnknownFileType(_)
+                ))
+            );
+        }
     }
 
-    // STENT TODO these are actually integration tests, so move them to tests dir
+    // TODO these are actually integration tests, so move them to tests dir
     mod config_to_tree {
         use super::*;
 
@@ -840,38 +825,4 @@ mod tests {
             );
         }
     }
-}
-
-// STENT TODO grabbed these from ndm_smt_secrets_parser
-#[cfg(test)]
-mod tests2 {
-    use super::*;
-    use crate::utils::test_utils::assert_err;
-    use crate::Secret;
-    use std::path::Path;
-
-    // #[test]
-    // fn parser_toml_file_happy_case() {
-    //     let src_dir = env!("CARGO_MANIFEST_DIR");
-    //     let resources_dir = Path::new(&src_dir).join("examples");
-    //     let path = resources_dir.join("ndm_smt_secrets_example.toml");
-
-    //     let secrets = NdmSmtSecretsParser::from(path).parse().unwrap();
-
-    //     assert_eq!(
-    //         secrets.master_secret,
-    //         Secret::from_str("master_secret").unwrap()
-    //     );
-    //     assert_eq!(secrets.salt_b, Secret::from_str("salt_b").unwrap());
-    //     assert_eq!(secrets.salt_s, Secret::from_str("salt_s").unwrap());
-    // }
-
-    // #[test]
-    // fn unknown_file_type() {
-    //     let path = PathBuf::from("./");
-    //     assert_err!(
-    //         NdmSmtSecretsParser::from(path).parse(),
-    //         Err(NdmSmtSecretsParserError::UnknownFileType(_))
-    //     );
-    // }
 }

@@ -45,6 +45,21 @@ impl MaxLiability {
     pub fn as_u64(&self) -> u64 {
         self.0
     }
+
+    /// Take the logarithm of the underlying value and return the smallest
+    /// allowed bit length that is greater than this value.
+    pub fn as_range_proof_upper_bound_bit_length(&self) -> u8 {
+        let pow_2 = (self.0 as f64).log2() as u8;
+        *ALLOWED_RANGE_PROOF_UPPER_BIT_SIZES
+            .iter()
+            .find(|i| **i > pow_2)
+            .unwrap_or_else(|| {
+                panic!(
+                    "[BUG] It should not be possible for the base 2 logarithm of {} to be above 64",
+                    self.0
+                )
+            })
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -107,6 +122,9 @@ mod tests {
     #[test]
     fn default_max_liability_is_in_allowed_list() {
         let pow_2 = (DEFAULT_MAX_LIABILITY as f64).log2() as u8;
-        assert!(ALLOWED_RANGE_PROOF_UPPER_BIT_SIZES.iter().find(|i| **i == pow_2).is_some());
+        assert!(ALLOWED_RANGE_PROOF_UPPER_BIT_SIZES
+            .iter()
+            .find(|i| **i == pow_2)
+            .is_some());
     }
 }
