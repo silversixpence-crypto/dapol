@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-
-use std::{convert::From};
+use serde_with::DeserializeFromStr;
+use std::convert::From;
 use std::str::FromStr;
 
 mod entities_parser;
@@ -33,11 +33,10 @@ pub struct Entity {
 /// The max size of the entity ID is 256 bits, but this is a soft limit so it
 /// can be increased if necessary. Note that the underlying array length will
 /// also have to be increased.
-// STENT TODO this is not enforced on deserialization, do that
 pub const ENTITY_ID_MAX_BYTES: usize = 32;
 
 /// Abstract representation of an entity ID.
-#[derive(PartialEq, Eq, Hash, Clone, Debug, Deserialize, Serialize)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug, DeserializeFromStr, Serialize)]
 pub struct EntityId(String);
 
 impl FromStr for EntityId {

@@ -22,7 +22,6 @@ pub const MAX_LENGTH_BYTES: usize = 32;
 /// Currently there is no need for the functionality provided by something like
 /// [primitive_types][U256] or [num256][Uint256] but those are options for
 /// later need be.
-// STENT TODO do we need serialize here?
 #[derive(Debug, Clone, PartialEq, Serialize, DeserializeFromStr)]
 pub struct Secret([u8; 32]);
 
@@ -97,5 +96,3 @@ pub enum SecretParserError {
     #[error("The given string has more than the max allowed bytes of {MAX_LENGTH_BYTES}")]
     StringTooLongError,
 }
-
-// STENT TODO tests

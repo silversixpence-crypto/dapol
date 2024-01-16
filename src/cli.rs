@@ -109,7 +109,6 @@ pub enum BuildKindCommand {
         #[arg(short, long, value_enum, help = include_str!("./shared_docs/accumulator_type.md"))]
         accumulator_type: AccumulatorType,
 
-        // STENT TODO the salts should have the option to be set via bytes as opposed to string
         #[arg(long, value_parser = Salt::from_str, help = include_str!("./shared_docs/salt_b.md"))]
         salt_b: Option<Salt>,
 

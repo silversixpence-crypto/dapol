@@ -73,8 +73,6 @@ impl FromStr for Salt {
         } else {
             let mut arr = [0u8; 32];
             // this works because string slices are stored fundamentally as u8 arrays
-            // STENT TODO so if I give it "0x4563412" then are the underlying bytes what I expect?
-            //   we are probably going to have to support bytes & strings :/
             arr[..s.len()].copy_from_slice(s.as_bytes());
             Ok(Salt(arr))
         }
