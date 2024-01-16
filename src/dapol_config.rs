@@ -670,14 +670,14 @@ mod tests {
 
         #[test]
         fn fail_when_unknown_secrets_file_type() {
-            let no_file_path = PathBuf::from("../LICENSE");
+            let no_file_ext = PathBuf::from("../LICENSE");
 
             let num_entities = 100u64;
 
             let res = DapolConfigBuilder::default()
                 .accumulator_type(AccumulatorType::NdmSmt)
                 .num_random_entities(num_entities)
-                .secrets_file_path(no_file_path)
+                .secrets_file_path(no_file_ext)
                 .build()
                 .unwrap()
                 .parse();
@@ -723,15 +723,8 @@ mod tests {
                 .parse()
                 .unwrap();
 
-            let acc = dapol_tree.accumultor();
-            match acc {
-                Accumulator::NdmSmt(ndm_smt) => {
-                    assert_eq!(ndm_smt.entity_mapping().len(), num_entities as usize);
-                    assert_eq!(ndm_smt.height(), &height);
-                }
-                _ => panic!("Incorrect accumulator"),
-            }
-
+            assert_eq!(dapol_tree.entity_mapping().unwrap().len(), num_entities as usize);
+            assert_eq!(dapol_tree.accumulator_type(), AccumulatorType::NdmSmt);
             assert_eq!(*dapol_tree.height(), height);
             assert_eq!(*dapol_tree.master_secret(), master_secret);
             assert_eq!(dapol_tree.max_liability(), MaxLiability::default());
@@ -755,13 +748,7 @@ mod tests {
                 .parse()
                 .unwrap();
 
-            let acc = dapol_tree.accumultor();
-            match acc {
-                Accumulator::NdmSmt(ndm_smt) => {
-                    assert_eq!(ndm_smt.entity_mapping().len(), num_random_entities as usize);
-                }
-                _ => panic!("Incorrect accumulator"),
-            }
+            assert_eq!(dapol_tree.entity_mapping().unwrap().len(), num_random_entities as usize);
         }
 
         #[test]

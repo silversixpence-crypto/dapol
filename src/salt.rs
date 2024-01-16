@@ -134,4 +134,29 @@ pub enum SaltParserError {
     StringTooLongError,
 }
 
-// STENT TODO tests
+// -------------------------------------------------------------------------------------------------
+// Unit tests.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn randomly_generated_salts_differ_enough() {
+        let salt_1 = Salt::generate_random();
+        let salt_2 = Salt::generate_random();
+        let threshold = 10;
+
+        let iter_1 = salt_1.0.iter();
+        let iter_2 = salt_2.0.iter();
+
+        // Technically there is a chance fair chance that this test fails.
+        assert!(
+            iter_1
+                .zip(iter_2)
+                .filter(|(byte_1, byte_2)| byte_1 == byte_2)
+                .count()
+                < threshold
+        );
+    }
+}

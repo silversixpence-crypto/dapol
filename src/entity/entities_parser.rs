@@ -183,6 +183,7 @@ pub enum EntitiesParserError {
 mod tests {
     use super::*;
     use std::path::Path;
+    use crate::utils::test_utils::assert_err;
 
     #[test]
     fn parser_csv_file_happy_case() {
@@ -219,5 +220,18 @@ mod tests {
         assert_eq!(entities.len(), num_entities as usize);
     }
 
-    // STENT TODO test failure cases like unsupported file type (see dapol_config tests for copypasta)
+    #[test]
+    fn fail_when_unsupproted_file_type() {
+        let this_file = std::file!();
+        let unsupported_path = PathBuf::from(this_file);
+        let res = EntitiesParser::new().with_path(unsupported_path).parse_file();
+        assert_err!(res, Err(EntitiesParserError::UnsupportedFileType { ext: _ }));
+    }
+
+    #[test]
+    fn fail_when_unknown_file_type() {
+        let no_file_ext = PathBuf::from("../../LICENSE");
+        let res = EntitiesParser::new().with_path(no_file_ext).parse_file();
+        assert_err!(res, Err(EntitiesParserError::UnknownFileType(_)));
+    }
 }
