@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use crate::{
     accumulators::{Accumulator, AccumulatorType, NdmSmt, NdmSmtError},
-    read_write_utils::{self, ReadWriteError},
+    read_write_utils::{self},
     utils::LogOnErr,
     AggregationFactor, Entity, EntityId, Height, InclusionProof, MaxLiability, MaxThreadCount,
     Salt, Secret,
@@ -197,8 +197,8 @@ impl DapolTree {
     }
 
     #[doc = include_str!("./shared_docs/max_liability.md")]
-    pub fn max_liability(&self) -> MaxLiability {
-        self.max_liability
+    pub fn max_liability(&self) -> &MaxLiability {
+        &self.max_liability
     }
 
     #[doc = include_str!("./shared_docs/height.md")]
@@ -243,13 +243,15 @@ impl DapolTree {
         match path.extension() {
             Some(ext) => {
                 if ext != SERIALIZED_TREE_EXTENSION {
-                    Err(ReadWriteError::UnsupportedFileExtension {
+                    Err(read_write_utils::ReadWriteError::UnsupportedFileExtension {
                         expected: SERIALIZED_TREE_EXTENSION.to_owned(),
                         actual: ext.to_os_string(),
                     })?;
                 }
             }
-            None => Err(ReadWriteError::NotAFile(path.clone().into_os_string()))?,
+            None => Err(read_write_utils::ReadWriteError::NotAFile(
+                path.clone().into_os_string(),
+            ))?,
         }
 
         let dapol_tree: DapolTree =
@@ -289,7 +291,9 @@ impl DapolTree {
     /// let dir = PathBuf::from("./");
     /// let path = DapolTree::parse_serialization_path(dir).unwrap();
     /// ```
-    pub fn parse_serialization_path(path: PathBuf) -> Result<PathBuf, ReadWriteError> {
+    pub fn parse_serialization_path(
+        path: PathBuf,
+    ) -> Result<PathBuf, read_write_utils::ReadWriteError> {
         read_write_utils::parse_serialization_path(
             path,
             SERIALIZED_TREE_EXTENSION,
@@ -304,7 +308,7 @@ impl DapolTree {
     /// An error is returned if
     /// 1. [bincode] fails to serialize the file.
     /// 2. There is an issue opening or writing the file.
-    pub fn serialize(&self, path: PathBuf) -> Result<(), DapolTreeError> {
+    pub fn serialize(&self, path: PathBuf) -> Result<PathBuf, DapolTreeError> {
         let path = DapolTree::parse_serialization_path(path)?;
 
         info!(
@@ -312,8 +316,9 @@ impl DapolTree {
             path.clone().into_os_string()
         );
 
-        read_write_utils::serialize_to_bin_file(self, path).log_on_err()?;
-        Ok(())
+        read_write_utils::serialize_to_bin_file(self, path.clone()).log_on_err()?;
+
+        Ok(path)
     }
 }
 
@@ -324,10 +329,131 @@ impl DapolTree {
 #[derive(thiserror::Error, Debug)]
 pub enum DapolTreeError {
     #[error("Error serializing/deserializing file")]
-    SerdeError(#[from] ReadWriteError),
+    SerdeError(#[from] read_write_utils::ReadWriteError),
     #[error("Error constructing a new NDM-SMT")]
     NdmSmtConstructionError(#[from] NdmSmtError),
 }
 
 // -------------------------------------------------------------------------------------------------
-// STENT TODO test
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils::test_utils::assert_err;
+    use crate::{
+        AccumulatorType, DapolTree, Entity, EntityId, Height, MaxLiability, MaxThreadCount, Salt,
+        Secret,
+    };
+    use std::path::PathBuf;
+    use std::str::FromStr;
+
+    #[test]
+    fn constructor_and_getters_work() {
+        let accumulator_type = AccumulatorType::NdmSmt;
+        let height = Height::expect_from(8);
+        let salt_b = Salt::from_str("salt_b").unwrap();
+        let salt_s = Salt::from_str("salt_s").unwrap();
+        let master_secret = Secret::from_str("master_secret").unwrap();
+        let max_liability = MaxLiability::from(10_000_000);
+        let max_thread_count = MaxThreadCount::from(8);
+
+        let entity = Entity {
+            liability: 1u64,
+            id: EntityId::from_str("id").unwrap(),
+        };
+        let entities = vec![entity.clone()];
+
+        let tree = DapolTree::new(
+            accumulator_type.clone(),
+            master_secret.clone(),
+            salt_b.clone(),
+            salt_s.clone(),
+            max_liability.clone(),
+            max_thread_count.clone(),
+            height.clone(),
+            entities,
+        )
+        .unwrap();
+
+        assert_eq!(tree.master_secret(), &master_secret);
+        assert_eq!(tree.height(), &height);
+        assert_eq!(tree.max_liability(), &max_liability);
+        assert_eq!(tree.salt_b(), &salt_b);
+        assert_eq!(tree.salt_s(), &salt_s);
+        assert_eq!(tree.accumulator_type(), accumulator_type);
+
+        assert!(tree.entity_mapping().is_some());
+        assert!(tree.entity_mapping().unwrap().get(&entity.id).is_some());
+    }
+
+    fn new_tree() -> DapolTree {
+        let accumulator_type = AccumulatorType::NdmSmt;
+        let height = Height::expect_from(8);
+        let salt_b = Salt::from_str("salt_b").unwrap();
+        let salt_s = Salt::from_str("salt_s").unwrap();
+        let master_secret = Secret::from_str("master_secret").unwrap();
+        let max_liability = MaxLiability::from(10_000_000);
+        let max_thread_count = MaxThreadCount::from(8);
+
+        let entity = Entity {
+            liability: 1u64,
+            id: EntityId::from_str("id").unwrap(),
+        };
+        let entities = vec![entity.clone()];
+
+        DapolTree::new(
+            accumulator_type.clone(),
+            master_secret.clone(),
+            salt_b.clone(),
+            salt_s.clone(),
+            max_liability.clone(),
+            max_thread_count.clone(),
+            height.clone(),
+            entities,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn serde_does_not_change_tree() {
+        let tree = new_tree();
+        let path = PathBuf::from_str("./mytree.myext").unwrap();
+        let path = tree.serialize(path).unwrap();
+        let tree_2 = DapolTree::deserialize(path).unwrap();
+
+        assert_eq!(tree.master_secret(), tree_2.master_secret());
+        assert_eq!(tree.height(), tree_2.height());
+        assert_eq!(tree.max_liability(), tree_2.max_liability());
+        assert_eq!(tree.salt_b(), tree_2.salt_b());
+        assert_eq!(tree.salt_s(), tree_2.salt_s());
+        assert_eq!(tree.accumulator_type(), tree_2.accumulator_type());
+        assert_eq!(tree.entity_mapping(), tree_2.entity_mapping());
+    }
+
+    #[test]
+    fn serialization_path_parser_fails_for_unsupported_extensions() {
+        let path = PathBuf::from_str("./mytree.myext").unwrap();
+
+        let res = DapolTree::parse_serialization_path(path);
+        assert_err!(
+            res,
+            Err(read_write_utils::ReadWriteError::UnsupportedFileExtension {
+                expected: _,
+                actual: _
+            })
+        );
+    }
+
+    #[test]
+    fn serialization_path_parser_gives_correct_file_prefix() {
+        let path = PathBuf::from_str("./").unwrap();
+        let path = DapolTree::parse_serialization_path(path).unwrap();
+        assert!(path.to_str().unwrap().contains("proof_of_liabilities_merkle_sum_tree_"));
+    }
+
+    #[test]
+    fn generate_inclusion_proof_works() {
+        let tree = new_tree();
+        assert!(tree.generate_inclusion_proof(&EntityId::from_str("id").unwrap()).is_ok());
+    }
+}

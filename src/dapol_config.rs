@@ -727,7 +727,7 @@ mod tests {
             assert_eq!(dapol_tree.accumulator_type(), AccumulatorType::NdmSmt);
             assert_eq!(*dapol_tree.height(), height);
             assert_eq!(*dapol_tree.master_secret(), master_secret);
-            assert_eq!(dapol_tree.max_liability(), MaxLiability::default());
+            assert_eq!(dapol_tree.max_liability(), &MaxLiability::default());
             assert_eq!(*dapol_tree.salt_b(), salt_b);
             assert_eq!(*dapol_tree.salt_s(), salt_s);
         }

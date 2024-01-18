@@ -87,7 +87,7 @@ fn main() {
                 .if_none_then(|| {
                     debug!("No serialization path set, skipping serialization of the tree");
                 })
-                .consume(|path| dapol_tree.serialize(path).unwrap());
+                .consume(|path| { dapol_tree.serialize(path).unwrap(); });
 
             if let Some(patharg) = gen_proofs {
                 let entity_ids = EntityIdsParser::from(
