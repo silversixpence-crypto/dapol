@@ -1,0 +1,1 @@
+used to determine how many of the range proofs are aggregated. Those that do not form part of the aggregated proof are just proved individually. The aggregation is a feature of the Bulletproofs protocol that improves efficiency.

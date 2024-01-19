@@ -15,8 +15,7 @@ use crate::{
     },
     entity::{Entity, EntityId},
     inclusion_proof::{AggregationFactor, InclusionProof},
-    kdf::generate_key,
-    MaxThreadCount, Salt, Secret, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
+    kdf, MaxThreadCount, Salt, Secret,
 };
 
 mod x_coord_generator;
@@ -135,10 +134,11 @@ impl NdmSmt {
                 .map(|(entity, x_coord)| {
                     // `w` is the letter used in the DAPOL+ paper.
                     let entity_secret: [u8; 32] =
-                        generate_key(None, master_secret_bytes, Some(&x_coord.to_le_bytes()))
+                        kdf::generate_key(None, master_secret_bytes, Some(&x_coord.to_le_bytes()))
                             .into();
-                    let blinding_factor = generate_key(Some(salt_b_bytes), &entity_secret, None);
-                    let entity_salt = generate_key(Some(salt_s_bytes), &entity_secret, None);
+                    let blinding_factor =
+                        kdf::generate_key(Some(salt_b_bytes), &entity_secret, None);
+                    let entity_salt = kdf::generate_key(Some(salt_s_bytes), &entity_secret, None);
 
                     InputLeafNode {
                         content: Content::new_leaf(
@@ -207,14 +207,9 @@ impl NdmSmt {
     /// are aggregated. Those that do not form part of the aggregated proof
     /// are just proved individually. The aggregation is a feature of the
     /// Bulletproofs protocol that improves efficiency.
-    /// - `upper_bound_bit_length` is used to determine the upper bound for the
-    /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
-    /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
-    /// some liability. The type is set to `u8` because we are not expected
-    /// to require bounds higher than $2^256$. Note that if the value is set
-    /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
-    /// an Err.
-    pub fn generate_inclusion_proof_with(
+    /// - `upper_bound_bit_length`:
+    #[doc = include_str!("../shared_docs/upper_bound_bit_length.md")]
+    pub fn generate_inclusion_proof(
         &self,
         master_secret: &Secret,
         salt_b: &Salt,
@@ -249,48 +244,17 @@ impl NdmSmt {
         )?)
     }
 
-    /// Generate an inclusion proof for the given entity_id.
-    ///
-    /// Use the default values for Bulletproof parameters:
-    /// - `aggregation_factor`: half of all the range proofs are aggregated
-    /// - `upper_bound_bit_length`: 64 (which should be plenty enough for most
-    ///   real-world cases)
-    ///
-    /// Parameters:
-    /// - `master_secret`:
-    #[doc = include_str!("../shared_docs/master_secret.md")]
-    /// - `salt_b`:
-    #[doc = include_str!("../shared_docs/salt_b.md")]
-    /// - `salt_s`:
-    #[doc = include_str!("../shared_docs/salt_s.md")]
-    /// - `entity_id`: unique ID for the entity that the proof will be generated for.
-    pub fn generate_inclusion_proof(
-        &self,
-        master_secret: &Secret,
-        salt_b: &Salt,
-        salt_s: &Salt,
-        entity_id: &EntityId,
-    ) -> Result<InclusionProof, NdmSmtError> {
-        self.generate_inclusion_proof_with(
-            master_secret,
-            salt_b,
-            salt_s,
-            entity_id,
-            AggregationFactor::default(),
-            DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
-        )
-    }
-
     /// Return the hash digest/bytes of the root node for the binary tree.
     pub fn root_hash(&self) -> H256 {
         self.binary_tree.root().content.hash
     }
 
-    /// Return the entity mapping, the x-coord that each entity is mapped to.
+    /// Hash map giving the x-coord that each entity is mapped to.
     pub fn entity_mapping(&self) -> &HashMap<EntityId, u64> {
         &self.entity_mapping
     }
 
+    #[doc = include_str!("../shared_docs/height.md")]
     pub fn height(&self) -> &Height {
         self.binary_tree.height()
     }
@@ -312,10 +276,10 @@ fn new_padding_node_content_closure(
         // copying
         let coord_bytes = coord.to_bytes();
         // pad_secret is given as 'w' in the DAPOL+ paper
-        let pad_secret = generate_key(None, &master_secret_bytes, Some(&coord_bytes));
+        let pad_secret = kdf::generate_key(None, &master_secret_bytes, Some(&coord_bytes));
         let pad_secret_bytes: [u8; 32] = pad_secret.into();
-        let blinding_factor = generate_key(Some(&salt_b_bytes), &pad_secret_bytes, None);
-        let salt = generate_key(Some(&salt_s_bytes), &pad_secret_bytes, None);
+        let blinding_factor = kdf::generate_key(Some(&salt_b_bytes), &pad_secret_bytes, None);
+        let salt = kdf::generate_key(Some(&salt_s_bytes), &pad_secret_bytes, None);
         Content::new_pad(blinding_factor.into(), coord, salt.into())
     }
 }
@@ -367,6 +331,14 @@ mod tests {
             id: EntityId::from_str("some entity").unwrap(),
         }];
 
-        NdmSmt::new(master_secret, salt_b, salt_s, height, max_thread_count, entities).unwrap();
+        NdmSmt::new(
+            master_secret,
+            salt_b,
+            salt_s,
+            height,
+            max_thread_count,
+            entities,
+        )
+        .unwrap();
     }
 }

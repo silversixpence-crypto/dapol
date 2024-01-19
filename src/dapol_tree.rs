@@ -135,17 +135,17 @@ impl DapolTree {
 
     /// Generate an inclusion proof for the given `entity_id`.
     ///
-    /// `aggregation_factor` is used to determine how many of the range proofs
-    /// are aggregated. Those that do not form part of the aggregated proof
-    /// are just proved individually. The aggregation is a feature of the
-    /// Bulletproofs protocol that improves efficiency.
+    /// Parameters:
+    /// - `entity_id`: unique ID for the entity that the proof will be generated for.
+    /// - `aggregation_factor`:
+    #[doc = include_str!("./shared_docs/aggregation_factor.md")]
     pub fn generate_inclusion_proof_with(
         &self,
         entity_id: &EntityId,
         aggregation_factor: AggregationFactor,
     ) -> Result<InclusionProof, NdmSmtError> {
         match &self.accumulator {
-            Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof_with(
+            Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof(
                 &self.master_secret,
                 &self.salt_b,
                 &self.salt_s,
@@ -157,6 +157,9 @@ impl DapolTree {
     }
 
     /// Generate an inclusion proof for the given `entity_id`.
+    ///
+    /// Parameters:
+    /// - `entity_id`: unique ID for the entity that the proof will be generated for.
     pub fn generate_inclusion_proof(
         &self,
         entity_id: &EntityId,
@@ -167,6 +170,8 @@ impl DapolTree {
                 &self.salt_b,
                 &self.salt_s,
                 entity_id,
+                AggregationFactor::default(),
+                self.max_liability.as_range_proof_upper_bound_bit_length(),
             ),
         }
     }
@@ -448,12 +453,26 @@ mod tests {
     fn serialization_path_parser_gives_correct_file_prefix() {
         let path = PathBuf::from_str("./").unwrap();
         let path = DapolTree::parse_serialization_path(path).unwrap();
-        assert!(path.to_str().unwrap().contains("proof_of_liabilities_merkle_sum_tree_"));
+        assert!(path
+            .to_str()
+            .unwrap()
+            .contains("proof_of_liabilities_merkle_sum_tree_"));
     }
 
     #[test]
     fn generate_inclusion_proof_works() {
         let tree = new_tree();
-        assert!(tree.generate_inclusion_proof(&EntityId::from_str("id").unwrap()).is_ok());
+        assert!(tree
+            .generate_inclusion_proof(&EntityId::from_str("id").unwrap())
+            .is_ok());
+    }
+
+    #[test]
+    fn generate_inclusion_proof_with_aggregation_factor_works() {
+        let tree = new_tree();
+        let agg = AggregationFactor::Divisor(2u8);
+        assert!(tree
+            .generate_inclusion_proof_with(&EntityId::from_str("id").unwrap(), agg)
+            .is_ok());
     }
 }
