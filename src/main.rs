@@ -21,6 +21,7 @@ fn main() {
             build_kind,
             gen_proofs,
             serialize,
+            root_serialize,
         } => {
             initialize_machine_parallelism();
 
@@ -35,7 +36,7 @@ fn main() {
                     match serialize {
                         Some(patharg) => {
                             let path = patharg.into_path().expect("Expected a file path, not stdout");
-                            DapolTree::parse_serialization_path(path).log_on_err().ok()
+                            DapolTree::parse_tree_serialization_path(path).log_on_err().ok()
                         }
                         None => None,
                     }
@@ -87,7 +88,9 @@ fn main() {
                 .if_none_then(|| {
                     debug!("No serialization path set, skipping serialization of the tree");
                 })
-                .consume(|path| { dapol_tree.serialize(path).unwrap(); });
+                .consume(|path| {
+                    dapol_tree.serialize(path).unwrap();
+                });
 
             if let Some(patharg) = gen_proofs {
                 let entity_ids = EntityIdsParser::from(
@@ -106,6 +109,21 @@ fn main() {
 
                     proof.serialize(&entity_id, dir.clone()).log_on_err_unwrap();
                 }
+            }
+
+            if let Some(patharg) = root_serialize {
+                let path = patharg
+                    .into_path()
+                    .expect("Expected a file path, not stdout");
+                if path.is_dir() {
+                    panic!("Root serialization path must be a directory so multiple files can be created");
+                }
+                dapol_tree
+                    .serialize_public_root_data(path.clone())
+                    .log_on_err_unwrap();
+                dapol_tree
+                    .serialize_secret_root_data(path)
+                    .log_on_err_unwrap();
             }
         }
         Command::GenProofs {
@@ -136,16 +154,13 @@ fn main() {
 
             for entity_id in entity_ids {
                 let proof = dapol_tree
-                    .generate_inclusion_proof_with(
-                        &entity_id,
-                        aggregation_factor.clone(),
-                    )
+                    .generate_inclusion_proof_with(&entity_id, aggregation_factor.clone())
                     .log_on_err_unwrap();
 
                 proof.serialize(&entity_id, dir.clone()).log_on_err_unwrap();
             }
         }
-        Command::VerifyProof {
+        Command::VerifyInclusionProof {
             file_path,
             root_hash,
         } => {
@@ -157,6 +172,19 @@ fn main() {
             .log_on_err_unwrap();
 
             proof.verify(root_hash).log_on_err_unwrap();
+        }
+        Command::VerifyRoot { root_pub, root_pvt } => {
+            let public_root_data = DapolTree::deserialize_public_root_data(
+                root_pub.into_path().expect("Expected file path, not stdin"),
+            )
+            .log_on_err_unwrap();
+            let secret_root_data = DapolTree::deserialize_secret_root_data(
+                root_pvt.into_path().expect("Expected file path, not stdin"),
+            )
+            .log_on_err_unwrap();
+
+            DapolTree::verify_root_commitment(&public_root_data.commitment, &secret_root_data)
+                .log_on_err_unwrap();
         }
     }
 }

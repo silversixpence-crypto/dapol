@@ -322,6 +322,7 @@ impl DapolConfig {
     }
 
     /// Try to construct a [crate][DapolTree] from the config.
+    // STENT TODO rather call this create_tree
     pub fn parse(self) -> Result<DapolTree, DapolConfigError> {
         debug!("Parsing config to create a new DAPOL tree: {:?}", self);
 

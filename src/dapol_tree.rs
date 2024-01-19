@@ -1,3 +1,4 @@
+use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use log::{debug, info};
 use primitive_types::H256;
@@ -7,6 +8,7 @@ use std::path::PathBuf;
 use crate::{
     accumulators::{Accumulator, AccumulatorType, NdmSmt, NdmSmtError},
     read_write_utils::{self},
+    secret,
     utils::LogOnErr,
     AggregationFactor, Entity, EntityId, Height, InclusionProof, MaxLiability, MaxThreadCount,
     Salt, Secret,
@@ -14,6 +16,12 @@ use crate::{
 
 const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
 const SERIALIZED_TREE_FILE_PREFIX: &str = "proof_of_liabilities_merkle_sum_tree_";
+
+const SERIALIZED_ROOT_PUB_FILE_PREFIX: &str = "root_public_data_";
+const SERIALIZED_ROOT_PVT_FILE_PREFIX: &str = "root_secret_data_";
+
+// -------------------------------------------------------------------------------------------------
+// Main struct.
 
 /// Proof of Liabilities Sparse Merkle Sum Tree.
 ///
@@ -29,6 +37,32 @@ pub struct DapolTree {
     salt_s: Salt,
     salt_b: Salt,
     max_liability: MaxLiability,
+}
+
+// -------------------------------------------------------------------------------------------------
+// Periphery structs.
+
+/// The public values of the root node.
+///
+/// These values should be put on a Public Bulletin Board (such as a blockchain)
+/// to legitimize the proof of liabilities. Without doing this there is no
+/// guarantee to the user that their inclusion proof is checked against the same
+/// data as other users' inclusion proofs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RootPublicData {
+    pub hash: H256,
+    pub commitment: RistrettoPoint,
+}
+
+/// The secret values of the root node.
+///
+/// These are the values that are used to construct the Pedersen commitment.
+/// These values should not be shared if the tree owner does not want to
+/// disclose their total liability.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RootSecretData {
+    pub liability: u64,
+    pub blinding_factor: Scalar,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -133,33 +167,7 @@ impl DapolTree {
             max_liability,
         };
 
-        info!(
-            "\nDAPOL tree has been constructed. Public data:\n \
-             - accumulator type: {}\n \
-             - height: {}\n \
-             - salt_b: 0x{}\n \
-             - salt_s: 0x{}\n \
-             - root hash: 0x{}\n \
-             - root commitment: {:?}",
-            accumulator_type,
-            height.as_u32(),
-            salt_b
-                .as_bytes()
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<String>(),
-            salt_s
-                .as_bytes()
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<String>(),
-            tree.root_hash()
-                .as_bytes()
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<String>(),
-            tree.root_commitment()
-        );
+        tree.log_successful_tree_creation();
 
         Ok(tree)
     }
@@ -206,6 +214,27 @@ impl DapolTree {
                 AggregationFactor::default(),
                 self.max_liability.as_range_proof_upper_bound_bit_length(),
             ),
+        }
+    }
+
+    /// Check that the public Pedersen commitment corresponds to the secret
+    /// values of the root.
+    ///
+    /// If the secret data does not match the commitment then false is returned,
+    /// otherwise true.
+    pub fn verify_root_commitment(
+        public_commitment: &RistrettoPoint,
+        root_secret_data: &RootSecretData,
+    ) -> Result<(), DapolTreeError> {
+        let commitment = PedersenGens::default().commit(
+            Scalar::from(root_secret_data.liability),
+            root_secret_data.blinding_factor,
+        );
+
+        if commitment == *public_commitment {
+            Ok(())
+        } else {
+            Err(DapolTreeError::RootVerificationError)
         }
     }
 }
@@ -259,8 +288,11 @@ impl DapolTree {
     ///
     /// These values can be made public and do not disclose secret information
     /// about the tree such as the number of leaf nodes or their liabilities.
-    pub fn root_public_data(&self) -> (&H256, &RistrettoPoint) {
-        (self.root_hash(), self.root_commitment())
+    pub fn root_public_data(&self) -> RootPublicData {
+        RootPublicData {
+            hash: self.root_hash().clone(),
+            commitment: self.root_commitment().clone(),
+        }
     }
 
     /// Liability & blinding factor that make up the Pederesen commitment of
@@ -268,8 +300,11 @@ impl DapolTree {
     ///
     /// Neither of these values should be made public if the owner of the tree
     /// does not want to disclose the total liability sum of their users.
-    pub fn root_secret_data(&self) -> (u64, &Scalar) {
-        (self.root_liability(), self.root_blinding_factor())
+    pub fn root_secret_data(&self) -> RootSecretData {
+        RootSecretData {
+            liability: self.root_liability(),
+            blinding_factor: self.root_blinding_factor().clone(),
+        }
     }
 
     #[doc = include_str!("./shared_docs/root_hash.md")]
@@ -284,12 +319,12 @@ impl DapolTree {
 
     #[doc = include_str!("./shared_docs/root_liability.md")]
     pub fn root_liability(&self) -> u64 {
-        self.root_liability()
+        self.accumulator.root_liability()
     }
 
     #[doc = include_str!("./shared_docs/root_blinding_factor.md")]
     pub fn root_blinding_factor(&self) -> &Scalar {
-        self.root_blinding_factor()
+        self.accumulator.root_blinding_factor()
     }
 }
 
@@ -297,47 +332,34 @@ impl DapolTree {
 // Serialization & deserialization.
 
 impl DapolTree {
-    /// Try deserialize from the given file path.
-    ///
-    /// The file is assumed to be in [bincode] format.
-    ///
-    /// An error is logged and returned if
-    /// 1. The file cannot be opened.
-    /// 2. The [bincode] deserializer fails.
-    pub fn deserialize(path: PathBuf) -> Result<DapolTree, DapolTreeError> {
-        debug!(
-            "Deserializing accumulator from file {:?}",
-            path.clone().into_os_string()
-        );
-
-        match path.extension() {
-            Some(ext) => {
-                if ext != SERIALIZED_TREE_EXTENSION {
-                    Err(read_write_utils::ReadWriteError::UnsupportedFileExtension {
-                        expected: SERIALIZED_TREE_EXTENSION.to_owned(),
-                        actual: ext.to_os_string(),
-                    })?;
-                }
-            }
-            None => Err(read_write_utils::ReadWriteError::NotAFile(
-                path.clone().into_os_string(),
-            ))?,
-        }
-
-        let dapol_tree: DapolTree =
-            read_write_utils::deserialize_from_bin_file(path.clone()).log_on_err()?;
-
-        let root_hash = match &dapol_tree.accumulator {
-            Accumulator::NdmSmt(ndm_smt) => ndm_smt.root_hash(),
-        };
-
+    fn log_successful_tree_creation(&self) {
         info!(
-            "Successfully deserialized dapol tree from file {:?} with root hash {:?}",
-            path.clone().into_os_string(),
-            root_hash
+            "\nDAPOL tree has been constructed. Public data:\n \
+             - accumulator type: {}\n \
+             - height: {}\n \
+             - salt_b: 0x{}\n \
+             - salt_s: 0x{}\n \
+             - root hash: 0x{}\n \
+             - root commitment: {:?}",
+            self.accumulator_type(),
+            self.height().as_u32(),
+            self.salt_b
+                .as_bytes()
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
+            self.salt_s
+                .as_bytes()
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
+            self.root_hash()
+                .as_bytes()
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
+            self.root_commitment().compress()
         );
-
-        Ok(dapol_tree)
     }
 
     /// Parse `path` as one that points to a serialized dapol tree file.
@@ -347,7 +369,7 @@ impl DapolTree {
     /// `path`. 2. Non-existing directory: in this case all dirs in the path
     /// are created, and a default file name is appended.
     /// 3. File in existing dir: in this case the extension is checked to be
-    /// [SERIALIZED_TREE_EXTENSION], then `path` is returned.
+    /// ".[SERIALIZED_TREE_EXTENSION]", then `path` is returned.
     /// 4. File in non-existing dir: dirs in the path are created and the file
     /// extension is checked.
     ///
@@ -359,9 +381,9 @@ impl DapolTree {
     /// use std::path::PathBuf;
     ///
     /// let dir = PathBuf::from("./");
-    /// let path = DapolTree::parse_serialization_path(dir).unwrap();
+    /// let path = DapolTree::parse_tree_serialization_path(dir).unwrap();
     /// ```
-    pub fn parse_serialization_path(
+    pub fn parse_tree_serialization_path(
         path: PathBuf,
     ) -> Result<PathBuf, read_write_utils::ReadWriteError> {
         read_write_utils::parse_serialization_path(
@@ -371,15 +393,98 @@ impl DapolTree {
         )
     }
 
-    /// Serialize to a file.
+    /// Parse `path` as one that points to a json file containing the public
+    /// data of the root node.
     ///
-    /// Serialization is done using [bincode]
+    /// `path` can be either of the following:
+    /// 1. Existing directory: in this case a default file name is appended to
+    /// `path`. 2. Non-existing directory: in this case all dirs in the path
+    /// are created, and a default file name is appended.
+    /// 3. File in existing dir: in this case the extension is checked to be
+    /// ".json", then `path` is returned.
+    /// 4. File in non-existing dir: dirs in the path are created and the file
+    /// extension is checked.
+    ///
+    /// The file prefix is [SERIALIZED_ROOT_PUB_FILE_PREFIX].
+    ///
+    /// Example:
+    /// ```
+    /// use dapol::DapolTree;
+    /// use std::path::PathBuf;
+    ///
+    /// let dir = PathBuf::from("./");
+    /// let path = DapolTree::parse_root_public_data_serialization_path(dir).unwrap();
+    /// ```
+    pub fn parse_root_public_data_serialization_path(
+        path: PathBuf,
+    ) -> Result<PathBuf, read_write_utils::ReadWriteError> {
+        read_write_utils::parse_serialization_path(path, "json", SERIALIZED_ROOT_PUB_FILE_PREFIX)
+    }
+
+    /// Parse `path` as one that points to a json file containing the secret
+    /// data of the root node.
+    ///
+    /// `path` can be either of the following:
+    /// 1. Existing directory: in this case a default file name is appended to
+    /// `path`. 2. Non-existing directory: in this case all dirs in the path
+    /// are created, and a default file name is appended.
+    /// 3. File in existing dir: in this case the extension is checked to be
+    /// ".json", then `path` is returned.
+    /// 4. File in non-existing dir: dirs in the path are created and the file
+    /// extension is checked.
+    ///
+    /// The file prefix is [SERIALIZED_ROOT_PVT_FILE_PREFIX].
+    ///
+    /// Example:
+    /// ```
+    /// use dapol::DapolTree;
+    /// use std::path::PathBuf;
+    ///
+    /// let dir = PathBuf::from("./");
+    /// let path = DapolTree::parse_root_secret_data_serialization_path(dir).unwrap();
+    /// ```
+    pub fn parse_root_secret_data_serialization_path(
+        path: PathBuf,
+    ) -> Result<PathBuf, read_write_utils::ReadWriteError> {
+        read_write_utils::parse_serialization_path(path, "json", SERIALIZED_ROOT_PVT_FILE_PREFIX)
+    }
+
+    /// Serialize the whole tree to a file.
+    ///
+    /// Serialization is done using [bincode].
     ///
     /// An error is returned if
     /// 1. [bincode] fails to serialize the file.
     /// 2. There is an issue opening or writing the file.
+    ///
+    /// `path` can be either of the following:
+    /// 1. Existing directory: in this case a default file name is appended to
+    /// `path`. 2. Non-existing directory: in this case all dirs in the path
+    /// are created, and a default file name is appended.
+    /// 3. File in existing dir: in this case the extension is checked to be
+    /// ".[SERIALIZED_TREE_EXTENSION]", then `path` is returned.
+    /// 4. File in non-existing dir: dirs in the path are created and the file
+    /// extension is checked.
+    ///
+    /// The file prefix is [SERIALIZED_TREE_FILE_PREFIX].
+    ///
+    /// Example:
+    /// ```
+    /// use dapol::{DapolTree, DapolConfig};
+    /// use std::path::Path;
+    ///
+    /// let src_dir = env!("CARGO_MANIFEST_DIR");
+    /// let examples_dir = Path::new(&src_dir).join("examples");
+    ///
+    /// let config_file_path = examples_dir.join("dapol_config_example.toml");
+    /// let dapol_config = DapolConfig::deserialize(config_file_path).unwrap();
+    /// let dapol_tree = dapol_config.parse().unwrap();
+    ///
+    /// let tree_path = examples_dir.join("my_serialized_tree_for_testing.dapoltree");
+    /// let _ = dapol_tree.serialize(tree_path).unwrap();
+    /// ```
     pub fn serialize(&self, path: PathBuf) -> Result<PathBuf, DapolTreeError> {
-        let path = DapolTree::parse_serialization_path(path)?;
+        let path = DapolTree::parse_tree_serialization_path(path)?;
 
         info!(
             "Serializing accumulator to file {:?}",
@@ -389,6 +494,186 @@ impl DapolTree {
         read_write_utils::serialize_to_bin_file(&self, path.clone()).log_on_err()?;
 
         Ok(path)
+    }
+
+    /// Serialize the public root node data to a file.
+    ///
+    /// The data that will be serialized to a json file:
+    /// - Pedersen commitment
+    /// - hash
+    ///
+    /// An error is returned if
+    /// 1. [serde_json] fails to serialize the file.
+    /// 2. There is an issue opening or writing to the file.
+    ///
+    /// `path` can be either of the following:
+    /// 1. Existing directory: in this case a default file name is appended to
+    /// `path`. 2. Non-existing directory: in this case all dirs in the path
+    /// are created, and a default file name is appended.
+    /// 3. File in existing dir: in this case the extension is checked to be
+    /// ".json", then `path` is returned.
+    /// 4. File in non-existing dir: dirs in the path are created and the file
+    /// extension is checked.
+    ///
+    /// The file prefix is [SERIALIZED_ROOT_PUB_FILE_PREFIX].
+    ///
+    /// Example:
+    /// ```
+    /// use dapol::{DapolTree, DapolConfig};
+    /// use std::path::Path;
+    ///
+    /// let src_dir = env!("CARGO_MANIFEST_DIR");
+    /// let examples_dir = Path::new(&src_dir).join("examples");
+    /// let config_file_path = examples_dir.join("dapol_config_example.toml");
+    /// let dapol_config = DapolConfig::deserialize(config_file_path).unwrap();
+    /// let dapol_tree = dapol_config.parse().unwrap();
+    ///
+    /// let public_root_path = examples_dir.join("root_public_data.json");
+    /// let _ = dapol_tree.serialize_public_root_data(public_root_path).unwrap();
+    /// ```
+    pub fn serialize_public_root_data(&self, path: PathBuf) -> Result<PathBuf, DapolTreeError> {
+        let public_root_data: RootPublicData = self.root_public_data();
+        let path = DapolTree::parse_root_public_data_serialization_path(path.clone())?;
+        read_write_utils::serialize_to_json_file(&public_root_data, path.clone())?;
+
+        Ok(path)
+    }
+
+    /// Serialize the public root node data to a file.
+    ///
+    /// The data that will be serialized to a json file:
+    /// - Pedersen commitment
+    /// - hash
+    /// - secret data (liability & blinding factor for Pedersen commitment)
+    ///
+    /// An error is returned if
+    /// 1. [serde_json] fails to serialize any of the files.
+    /// 2. There is an issue opening or writing to any of the files.
+    ///
+    /// `path` can be either of the following:
+    /// 1. Existing directory: in this case a default file name is appended to
+    /// `path`. 2. Non-existing directory: in this case all dirs in the path
+    /// are created, and a default file name is appended.
+    /// 3. File in existing dir: in this case the extension is checked to be
+    /// ".json", then `path` is returned.
+    /// 4. File in non-existing dir: dirs in the path are created and the file
+    /// extension is checked.
+    ///
+    /// The file prefix is [SERIALIZED_ROOT_PVT_FILE_PREFIX].
+    ///
+    /// Example:
+    /// ```
+    /// use dapol::{DapolTree, DapolConfig};
+    /// use std::path::Path;
+    ///
+    /// let src_dir = env!("CARGO_MANIFEST_DIR");
+    /// let examples_dir = Path::new(&src_dir).join("examples");
+    /// let config_file_path = examples_dir.join("dapol_config_example.toml");
+    /// let dapol_config = DapolConfig::deserialize(config_file_path).unwrap();
+    /// let dapol_tree = dapol_config.parse().unwrap();
+    ///
+    /// let secret_root_path = examples_dir.join("root_secret_data.json");
+    /// let _ = dapol_tree.serialize_secret_root_data(secret_root_path).unwrap();
+    /// ```
+    pub fn serialize_secret_root_data(&self, dir: PathBuf) -> Result<PathBuf, DapolTreeError> {
+        let secret_root_data: RootSecretData = self.root_secret_data();
+        let path = DapolTree::parse_root_secret_data_serialization_path(dir.clone())?;
+        read_write_utils::serialize_to_json_file(&secret_root_data, path.clone())?;
+
+        Ok(path)
+    }
+
+    /// Deserialize the tree from the given file path.
+    ///
+    /// The file is assumed to be in [bincode] format.
+    ///
+    /// An error is logged and returned if
+    /// 1. The file cannot be opened.
+    /// 2. The [bincode] deserializer fails.
+    /// 3. The file extension is not ".[SERIALIZED_TREE_EXTENSION]"
+    ///
+    /// Example:
+    /// ```
+    /// use dapol::{DapolTree, DapolConfig};
+    /// use std::path::Path;
+    ///
+    /// let src_dir = env!("CARGO_MANIFEST_DIR");
+    /// let examples_dir = Path::new(&src_dir).join("examples");
+    /// let tree_path = examples_dir.join("my_serialized_tree_for_testing.dapoltree");
+    /// let _ = DapolTree::deserialize(tree_path).unwrap();
+    /// ```
+    pub fn deserialize(path: PathBuf) -> Result<DapolTree, DapolTreeError> {
+        debug!(
+            "Deserializing DapolTree from file {:?}",
+            path.clone().into_os_string()
+        );
+
+        read_write_utils::check_deserialization_path(&path, SERIALIZED_TREE_EXTENSION)?;
+
+        let dapol_tree: DapolTree =
+            read_write_utils::deserialize_from_bin_file(path.clone()).log_on_err()?;
+
+        dapol_tree.log_successful_tree_creation();
+
+        Ok(dapol_tree)
+    }
+
+    /// Deserialize the public root data from the given file path.
+    ///
+    /// The file is assumed to be in json format.
+    ///
+    /// An error is logged and returned if
+    /// 1. The file cannot be opened.
+    /// 2. The [serde_json] deserializer fails.
+    /// 3. The file extension is not ".[SERIALIZED_ROOT_PUB_FILE_PREFIX]"
+    ///
+    /// Example:
+    /// ```
+    /// use dapol::DapolTree;
+    /// use std::path::Path;
+    ///
+    /// let src_dir = env!("CARGO_MANIFEST_DIR");
+    /// let examples_dir = Path::new(&src_dir).join("examples");
+    /// let public_root_path = examples_dir.join("root_public_data.json");
+    ///
+    /// let public_root_data = DapolTree::deserialize_public_root_data(public_root_path).unwrap();
+    /// ```
+    pub fn deserialize_public_root_data(path: PathBuf) -> Result<RootPublicData, DapolTreeError> {
+        read_write_utils::check_deserialization_path(&path, "json")?;
+
+        let root_public_data: RootPublicData =
+            read_write_utils::deserialize_from_json_file(path.clone()).log_on_err()?;
+
+        Ok(root_public_data)
+    }
+
+    /// Deserialize the secret root data from the given file path.
+    ///
+    /// The file is assumed to be in json format.
+    ///
+    /// An error is logged and returned if
+    /// 1. The file cannot be opened.
+    /// 2. The [serde_json] deserializer fails.
+    /// 3. The file extension is not ".[SERIALIZED_ROOT_PUB_FILE_PREFIX]"
+    ///
+    /// Example:
+    /// ```
+    /// use dapol::DapolTree;
+    /// use std::path::Path;
+    ///
+    /// let src_dir = env!("CARGO_MANIFEST_DIR");
+    /// let examples_dir = Path::new(&src_dir).join("examples");
+    /// let secret_root_path = examples_dir.join("root_secret_data.json");
+    ///
+    /// let secret_root_data = DapolTree::deserialize_secret_root_data(secret_root_path).unwrap();
+    /// ```
+    pub fn deserialize_secret_root_data(path: PathBuf) -> Result<RootSecretData, DapolTreeError> {
+        read_write_utils::check_deserialization_path(&path, "json")?;
+
+        let root_secret_data: RootSecretData =
+            read_write_utils::deserialize_from_json_file(path.clone()).log_on_err()?;
+
+        Ok(root_secret_data)
     }
 }
 
@@ -402,6 +687,8 @@ pub enum DapolTreeError {
     SerdeError(#[from] read_write_utils::ReadWriteError),
     #[error("Error constructing a new NDM-SMT")]
     NdmSmtConstructionError(#[from] NdmSmtError),
+    #[error("Verification of root data failed")]
+    RootVerificationError,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -414,7 +701,7 @@ mod tests {
         accumulators, AccumulatorType, DapolTree, Entity, EntityId, Height, MaxLiability,
         MaxThreadCount, Salt, Secret,
     };
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::str::FromStr;
 
     #[test]
@@ -487,9 +774,13 @@ mod tests {
     #[test]
     fn serde_does_not_change_tree() {
         let tree = new_tree();
-        let path =
-            PathBuf::from_str("./examples/my_serialized_tree_for_unit_tests.dapoltree").unwrap();
-        let path = tree.serialize(path).unwrap();
+
+        let src_dir = env!("CARGO_MANIFEST_DIR");
+        let examples_dir = Path::new(&src_dir).join("examples");
+        let path = examples_dir.join("my_serialized_tree_for_testing.dapoltree");
+        let path_2 = tree.serialize(path.clone()).unwrap();
+        assert_eq!(path, path_2);
+
         let tree_2 = DapolTree::deserialize(path).unwrap();
 
         assert_eq!(tree.master_secret(), tree_2.master_secret());
@@ -505,7 +796,7 @@ mod tests {
     fn serialization_path_parser_fails_for_unsupported_extensions() {
         let path = PathBuf::from_str("./mytree.myext").unwrap();
 
-        let res = DapolTree::parse_serialization_path(path);
+        let res = DapolTree::parse_tree_serialization_path(path);
         assert_err!(
             res,
             Err(read_write_utils::ReadWriteError::UnsupportedFileExtension {
@@ -518,7 +809,7 @@ mod tests {
     #[test]
     fn serialization_path_parser_gives_correct_file_prefix() {
         let path = PathBuf::from_str("./").unwrap();
-        let path = DapolTree::parse_serialization_path(path).unwrap();
+        let path = DapolTree::parse_tree_serialization_path(path).unwrap();
         assert!(path
             .to_str()
             .unwrap()

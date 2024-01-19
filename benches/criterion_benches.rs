@@ -165,7 +165,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 let src_dir = env!("CARGO_MANIFEST_DIR");
                 let target_dir = Path::new(&src_dir).join("target");
                 let dir = target_dir.join("serialized_trees");
-                let path = DapolTree::parse_serialization_path(dir).unwrap();
+                let path = DapolTree::parse_tree_serialization_path(dir).unwrap();
                 let tree = dapol_tree.expect("Tree should have been built");
 
                 group.bench_function(

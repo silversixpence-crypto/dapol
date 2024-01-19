@@ -48,9 +48,37 @@ pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T
     let buf_reader = BufReader::new(file);
     let decoded: T = bincode::deserialize_from(buf_reader)?;
 
-    // use bincode::Options;
-    // let my_options = bincode::DefaultOptions::new().with_limit(1000000u64);
-    // let decoded: T = my_options.deserialize_from(buf_reader)?;
+    Ok(decoded)
+}
+
+/// Use [serde_json] to serialize `structure` to a file at the given `path`.
+///
+/// An error is returned if
+/// 1. [serde_json] fails to serialize the file.
+/// 2. There is an issue opening or writing the file.
+///
+/// Turning on debug-level logs will show timing.
+#[stime("debug")]
+pub fn serialize_to_json_file<T: Serialize>(
+    structure: &T,
+    path: PathBuf,
+) -> Result<(), ReadWriteError> {
+    let mut file = File::create(path)?;
+    let encoded = serde_json::to_writer_pretty(file, structure);
+
+    Ok(())
+}
+
+/// Try to deserialize the given json file to the specified type.
+///
+/// An error is returned if
+/// 1. The file cannot be opened.
+/// 2. The [serde_json] deserializer fails.
+#[stime("debug")]
+pub fn deserialize_from_json_file<T: DeserializeOwned>(path: PathBuf) -> Result<T, ReadWriteError> {
+    let file = File::open(path)?;
+    let buf_reader = BufReader::new(file);
+    let decoded: T = serde_json::from_reader(buf_reader)?;
 
     Ok(decoded)
 }
@@ -124,6 +152,34 @@ pub fn parse_serialization_path(
     }
 }
 
+/// Sanity check the path for use in deserialization.
+///
+/// The path is checked to
+/// 1. Not be a directory
+/// 2. Have the correct file extension
+pub fn check_deserialization_path(
+    path: &PathBuf,
+    expected_ext: &str,
+) -> Result<(), ReadWriteError> {
+    if path.is_dir() {
+        return Err(ReadWriteError::NotAFile(path.clone().into_os_string()));
+    }
+
+    match path.extension() {
+        Some(ext) => {
+            if ext == expected_ext {
+                Ok(())
+            } else {
+                Err(ReadWriteError::UnsupportedFileExtension {
+                    expected: expected_ext.to_owned(),
+                    actual: ext.to_os_string(),
+                })
+            }
+        }
+        None => Err(ReadWriteError::NoFileExtension(path.clone().into_os_string())),
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
@@ -131,12 +187,16 @@ pub fn parse_serialization_path(
 pub enum ReadWriteError {
     #[error("Problem serializing/deserializing with bincode")]
     BincodeSerdeError(#[from] bincode::Error),
+    #[error("Problem serializing/deserializing with serde_json")]
+    JsonSerdeError(#[from] serde_json::Error),
     #[error("Problem writing to file")]
     FileWriteError(#[from] std::io::Error),
     #[error("Unknown file extension {actual:?}, expected {expected}")]
     UnsupportedFileExtension { expected: String, actual: OsString },
-    #[error("Expected a file but only a path was given: {0:?}")]
+    #[error("Expected a file but only a directory was given: {0:?}")]
     NotAFile(OsString),
+    #[error("No file extension found in path {0:?}")]
+    NoFileExtension(OsString),
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -186,5 +246,7 @@ mod tests {
 
         // TODO test that intermediate dirs are created, but how to do this
         // without actually creating dirs?
+
+        // TODO test binary & json se/de workse
     }
 }
