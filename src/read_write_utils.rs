@@ -47,6 +47,11 @@ pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T
     let file = File::open(path)?;
     let buf_reader = BufReader::new(file);
     let decoded: T = bincode::deserialize_from(buf_reader)?;
+
+    // use bincode::Options;
+    // let my_options = bincode::DefaultOptions::new().with_limit(1000000u64);
+    // let decoded: T = my_options.deserialize_from(buf_reader)?;
+
     Ok(decoded)
 }
 

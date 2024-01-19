@@ -96,9 +96,12 @@ pub struct DapolConfig {
     secrets: SecretsConfig,
 }
 
+use serde_with::{serde_as, DisplayFromStr};
+#[serde_as]
 #[derive(Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct SecretsConfig {
     file_path: Option<PathBuf>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
     master_secret: Option<Secret>,
 }
 

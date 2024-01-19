@@ -321,7 +321,7 @@ impl DapolTree {
             path.clone().into_os_string()
         );
 
-        read_write_utils::serialize_to_bin_file(self, path.clone()).log_on_err()?;
+        read_write_utils::serialize_to_bin_file(&self, path.clone()).log_on_err()?;
 
         Ok(path)
     }
@@ -347,7 +347,7 @@ mod tests {
     use crate::utils::test_utils::assert_err;
     use crate::{
         AccumulatorType, DapolTree, Entity, EntityId, Height, MaxLiability, MaxThreadCount, Salt,
-        Secret,
+        Secret, accumulators,
     };
     use std::path::PathBuf;
     use std::str::FromStr;
@@ -422,7 +422,7 @@ mod tests {
     #[test]
     fn serde_does_not_change_tree() {
         let tree = new_tree();
-        let path = PathBuf::from_str("./mytree.myext").unwrap();
+        let path = PathBuf::from_str("./examples/my_serialized_tree_for_unit_tests.dapoltree").unwrap();
         let path = tree.serialize(path).unwrap();
         let tree_2 = DapolTree::deserialize(path).unwrap();
 

@@ -1,7 +1,6 @@
+use serde_with::{DeserializeFromStr, SerializeDisplay};
 use std::convert::From;
-
-use serde::Serialize;
-use serde_with::DeserializeFromStr;
+use std::fmt;
 
 /// The max size of the secret is 256 bits, but this is a soft limit so it
 /// can be increased if necessary. Note that the underlying array length will
@@ -22,12 +21,22 @@ pub const MAX_LENGTH_BYTES: usize = 32;
 /// Currently there is no need for the functionality provided by something like
 /// [primitive_types][U256] or [num256][Uint256] but those are options for
 /// later need be.
-#[derive(Debug, Clone, PartialEq, Serialize, DeserializeFromStr)]
+#[derive(Debug, Clone, PartialEq, SerializeDisplay, DeserializeFromStr)]
 pub struct Secret([u8; 32]);
 
 impl Secret {
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Display (used for serialization).
+
+impl fmt::Display for Secret {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = String::from_utf8_lossy(&self.0);
+        write!(f, "{}", s)
     }
 }
 
