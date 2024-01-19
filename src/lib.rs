@@ -60,7 +60,9 @@ pub mod read_write_utils;
 pub mod utils;
 
 mod dapol_tree;
-pub use dapol_tree::{DapolTree, DapolTreeError};
+pub use dapol_tree::{DapolTree, DapolTreeError, RootPublicData, RootSecretData};
+
+pub use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 
 mod dapol_config;
 pub use dapol_config::{

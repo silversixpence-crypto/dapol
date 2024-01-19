@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use primitive_types::H256;
 use serde::{Deserialize, Serialize};
 
@@ -244,9 +245,24 @@ impl NdmSmt {
         )?)
     }
 
-    /// Return the hash digest/bytes of the root node for the binary tree.
-    pub fn root_hash(&self) -> H256 {
-        self.binary_tree.root().content.hash
+    #[doc = include_str!("../shared_docs/root_hash.md")]
+    pub fn root_hash(&self) -> &H256 {
+        &self.binary_tree.root().content.hash
+    }
+
+    #[doc = include_str!("../shared_docs/root_hash.md")]
+    pub fn root_commitment(&self) -> &RistrettoPoint {
+        &self.binary_tree.root().content.commitment
+    }
+
+    #[doc = include_str!("../shared_docs/root_liability.md")]
+    pub fn root_liability(&self) -> u64 {
+        self.binary_tree.root().content.liability
+    }
+
+    #[doc = include_str!("../shared_docs/root_blinding_factor.md")]
+    pub fn root_blinding_factor(&self) -> &Scalar {
+        &self.binary_tree.root().content.blinding_factor
     }
 
     /// Hash map giving the x-coord that each entity is mapped to.

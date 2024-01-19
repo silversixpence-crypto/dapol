@@ -123,7 +123,7 @@ pub fn simple_inclusion_proof_generation_and_verification(
     entity_id: dapol::EntityId,
 ) {
     let inclusion_proof = dapol_tree.generate_inclusion_proof(&entity_id).unwrap();
-    inclusion_proof.verify(dapol_tree.root_hash()).unwrap();
+    inclusion_proof.verify(dapol_tree.root_hash().clone()).unwrap();
 }
 
 /// Example on how to generate and verify inclusion proofs.
@@ -146,5 +146,5 @@ pub fn advanced_inclusion_proof_generation_and_verification(
         .generate_inclusion_proof_with(&entity_id, aggregation_factor)
         .unwrap();
 
-    inclusion_proof.verify(dapol_tree.root_hash()).unwrap();
+    inclusion_proof.verify(dapol_tree.root_hash().clone()).unwrap();
 }

@@ -353,11 +353,6 @@ impl DapolConfig {
         )
         .log_on_err()?;
 
-        info!(
-            "Successfully built DAPOL tree with root hash {:?}",
-            dapol_tree.root_hash()
-        );
-
         Ok(dapol_tree)
     }
 

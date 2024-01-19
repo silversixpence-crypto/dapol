@@ -1,3 +1,4 @@
+use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use log::{debug, info};
 use primitive_types::H256;
 use serde::{Deserialize, Serialize};
@@ -50,15 +51,15 @@ impl DapolTree {
     ///   value must be set.
     /// - `salt_b`: If not set then it will be randomly generated.
     #[doc = include_str!("./shared_docs/salt_b.md")]
-    /// - `salt_s`: If not set then it will be
-    ///   randomly generated.
+    /// - `salt_s`: If not set then it will be randomly generated.
     #[doc = include_str!("./shared_docs/salt_s.md")]
     /// - `max_liability`: If not set then a default value is used.
     #[doc = include_str!("./shared_docs/max_liability.md")]
-    /// - `height`: If not set the [default height] will be used [crate][Height].
+    /// - `height`: If not set the [default height] will be used
+    ///   [crate][Height].
     #[doc = include_str!("./shared_docs/height.md")]
-    /// - `max_thread_count`: If not set the max parallelism of the
-    ///   underlying machine will be used.
+    /// - `max_thread_count`: If not set the max parallelism of the underlying
+    ///   machine will be used.
     #[doc = include_str!("./shared_docs/max_thread_count.md")]
     /// - `secrets_file_path`: Path to the secrets file. If not present the
     ///   secrets will be generated randomly.
@@ -124,19 +125,50 @@ impl DapolTree {
             }
         };
 
-        Ok(DapolTree {
+        let tree = DapolTree {
             accumulator,
             master_secret,
-            salt_s,
-            salt_b,
+            salt_b: salt_b.clone(),
+            salt_s: salt_s.clone(),
             max_liability,
-        })
+        };
+
+        info!(
+            "\nDAPOL tree has been constructed. Public data:\n \
+             - accumulator type: {}\n \
+             - height: {}\n \
+             - salt_b: 0x{}\n \
+             - salt_s: 0x{}\n \
+             - root hash: 0x{}\n \
+             - root commitment: {:?}",
+            accumulator_type,
+            height.as_u32(),
+            salt_b
+                .as_bytes()
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
+            salt_s
+                .as_bytes()
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
+            tree.root_hash()
+                .as_bytes()
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
+            tree.root_commitment()
+        );
+
+        Ok(tree)
     }
 
     /// Generate an inclusion proof for the given `entity_id`.
     ///
     /// Parameters:
-    /// - `entity_id`: unique ID for the entity that the proof will be generated for.
+    /// - `entity_id`: unique ID for the entity that the proof will be generated
+    ///   for.
     /// - `aggregation_factor`:
     #[doc = include_str!("./shared_docs/aggregation_factor.md")]
     pub fn generate_inclusion_proof_with(
@@ -159,7 +191,8 @@ impl DapolTree {
     /// Generate an inclusion proof for the given `entity_id`.
     ///
     /// Parameters:
-    /// - `entity_id`: unique ID for the entity that the proof will be generated for.
+    /// - `entity_id`: unique ID for the entity that the proof will be generated
+    ///   for.
     pub fn generate_inclusion_proof(
         &self,
         entity_id: &EntityId,
@@ -222,9 +255,41 @@ impl DapolTree {
         }
     }
 
-    /// Return the hash digest/bytes of the root node for the binary tree.
-    pub fn root_hash(&self) -> H256 {
+    /// Hash & Pedersen commitment for the root node of the Merkle Sum Tree.
+    ///
+    /// These values can be made public and do not disclose secret information
+    /// about the tree such as the number of leaf nodes or their liabilities.
+    pub fn root_public_data(&self) -> (&H256, &RistrettoPoint) {
+        (self.root_hash(), self.root_commitment())
+    }
+
+    /// Liability & blinding factor that make up the Pederesen commitment of
+    /// the Merkle Sum Tree.
+    ///
+    /// Neither of these values should be made public if the owner of the tree
+    /// does not want to disclose the total liability sum of their users.
+    pub fn root_secret_data(&self) -> (u64, &Scalar) {
+        (self.root_liability(), self.root_blinding_factor())
+    }
+
+    #[doc = include_str!("./shared_docs/root_hash.md")]
+    pub fn root_hash(&self) -> &H256 {
         self.accumulator.root_hash()
+    }
+
+    #[doc = include_str!("./shared_docs/root_commitment.md")]
+    pub fn root_commitment(&self) -> &RistrettoPoint {
+        self.accumulator.root_commitment()
+    }
+
+    #[doc = include_str!("./shared_docs/root_liability.md")]
+    pub fn root_liability(&self) -> u64 {
+        self.root_liability()
+    }
+
+    #[doc = include_str!("./shared_docs/root_blinding_factor.md")]
+    pub fn root_blinding_factor(&self) -> &Scalar {
+        self.root_blinding_factor()
     }
 }
 
@@ -346,8 +411,8 @@ mod tests {
     use super::*;
     use crate::utils::test_utils::assert_err;
     use crate::{
-        AccumulatorType, DapolTree, Entity, EntityId, Height, MaxLiability, MaxThreadCount, Salt,
-        Secret, accumulators,
+        accumulators, AccumulatorType, DapolTree, Entity, EntityId, Height, MaxLiability,
+        MaxThreadCount, Salt, Secret,
     };
     use std::path::PathBuf;
     use std::str::FromStr;
@@ -422,7 +487,8 @@ mod tests {
     #[test]
     fn serde_does_not_change_tree() {
         let tree = new_tree();
-        let path = PathBuf::from_str("./examples/my_serialized_tree_for_unit_tests.dapoltree").unwrap();
+        let path =
+            PathBuf::from_str("./examples/my_serialized_tree_for_unit_tests.dapoltree").unwrap();
         let path = tree.serialize(path).unwrap();
         let tree_2 = DapolTree::deserialize(path).unwrap();
 
