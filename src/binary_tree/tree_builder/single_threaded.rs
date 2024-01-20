@@ -96,6 +96,10 @@ impl<C: Clone> HashMapStore<C> {
     pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         self.map.get(coord).map(|n| (*n).clone())
     }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -124,15 +128,15 @@ impl<C> MaybeUnmatchedPair<C> {
         F: Fn(&Coordinate) -> C,
     {
         match (self.left, self.right) {
-            (Some(left), Some(right)) => MatchedPair::from(left, right),
-            (Some(left), None) => MatchedPair::from(
+            (Some(left), Some(right)) => MatchedPair::from((left, right)),
+            (Some(left), None) => MatchedPair::from((
                 left.new_sibling_padding_node(new_padding_node_content),
                 left,
-            ),
-            (None, Some(right)) => MatchedPair::from(
+            )),
+            (None, Some(right)) => MatchedPair::from((
                 right.new_sibling_padding_node(new_padding_node_content),
                 right,
-            ),
+            )),
             (None, None) => {
                 panic!("{} Invalid pair (None, None) found", BUG)
             }
@@ -219,7 +223,7 @@ where
             MIN_STORE_DEPTH
         );
         assert!(
-            store_depth <= height.as_raw_int(),
+            store_depth <= height.as_u8(),
             "{} Store depth cannot exceed the height of the tree",
             BUG
         );
@@ -236,7 +240,7 @@ where
             .into_iter()
             // Sort nodes into pairs (left & right siblings).
             .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
-                let sibling = Sibling::from_node(node);
+                let sibling = Sibling::from(node);
                 match sibling {
                     // If we have found a left sibling then create a new pair.
                     Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
@@ -280,7 +284,7 @@ where
                 // a) node is a bottom layer leaf node (including padding nodes)
                 // b) node is in one of the top X layers where X = store_depth
                 // NOTE this includes the root node.
-                if y == 0 || y >= height.as_raw_int() - store_depth {
+                if y == 0 || y >= height.as_u8() - store_depth {
                     map.insert(pair.left.coord.clone(), pair.left);
                     map.insert(pair.right.coord.clone(), pair.right);
                 }
@@ -322,9 +326,9 @@ mod tests {
 
     #[test]
     fn err_when_parent_builder_height_not_set() {
-        let height = Height::from(4);
+        let height = Height::expect_from(4);
         let leaf_nodes = full_bottom_layer(&height);
-        let res = TreeBuilder::new()
+        let res = BinaryTreeBuilder::new()
             .with_leaf_nodes(leaf_nodes)
             .build_using_single_threaded_algorithm(generate_padding_closure());
 
@@ -334,8 +338,8 @@ mod tests {
 
     #[test]
     fn err_when_parent_builder_leaf_nodes_not_set() {
-        let height = Height::from(4);
-        let res = TreeBuilder::new()
+        let height = Height::expect_from(4);
+        let res = BinaryTreeBuilder::new()
             .with_height(height)
             .build_using_single_threaded_algorithm(generate_padding_closure());
 
@@ -345,8 +349,8 @@ mod tests {
 
     #[test]
     fn err_for_empty_leaves() {
-        let height = Height::from(5);
-        let res = TreeBuilder::<TestContent>::new()
+        let height = Height::expect_from(5);
+        let res = BinaryTreeBuilder::<TestContent>::new()
             .with_height(height)
             .with_leaf_nodes(Vec::<InputLeafNode<TestContent>>::new())
             .build_using_single_threaded_algorithm(generate_padding_closure());
@@ -356,32 +360,39 @@ mod tests {
 
     #[test]
     fn err_for_too_many_leaves_with_height_first() {
-        let height = Height::from(8u8);
+        let height = Height::expect_from(8u8);
+        let max_nodes = height.max_bottom_layer_nodes();
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: height.max_bottom_layer_nodes() + 1,
+            x_coord: max_nodes + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
             },
         });
 
-        let res = TreeBuilder::new()
+        let res = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_single_threaded_algorithm(generate_padding_closure());
 
-        assert_err!(res, Err(TreeBuildError::TooManyLeaves));
+        assert_err!(
+            res,
+            Err(TreeBuildError::TooManyLeaves {
+                given: leaf_nodes,
+                max: max_nodes,
+            })
+        );
     }
 
     #[test]
     fn err_for_duplicate_leaves() {
-        let height = Height::from(4);
+        let height = Height::expect_from(4);
         let mut leaf_nodes = sparse_leaves(&height);
         leaf_nodes.push(single_leaf(leaf_nodes.get(0).unwrap().x_coord));
 
-        let res = TreeBuilder::new()
+        let res = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_single_threaded_algorithm(generate_padding_closure());
@@ -392,10 +403,10 @@ mod tests {
 
     #[test]
     fn err_when_x_coord_greater_than_max() {
-        let height = Height::from(4);
+        let height = Height::expect_from(4);
         let leaf_node = single_leaf(height.max_bottom_layer_nodes() + 1);
 
-        let res = TreeBuilder::new()
+        let res = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(vec![leaf_node])
             .build_using_single_threaded_algorithm(generate_padding_closure());
@@ -410,11 +421,11 @@ mod tests {
         use rand::seq::SliceRandom;
         use rand::thread_rng;
 
-        let height = Height::from(4);
+        let height = Height::expect_from(4);
         let mut leaf_nodes = sparse_leaves(&height);
 
-        let tree = TreeBuilder::new()
-            .with_height(height.clone())
+        let tree = BinaryTreeBuilder::new()
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
@@ -422,7 +433,7 @@ mod tests {
 
         leaf_nodes.shuffle(&mut thread_rng());
 
-        let tree = TreeBuilder::new()
+        let tree = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_single_threaded_algorithm(&generate_padding_closure())
@@ -433,10 +444,10 @@ mod tests {
 
     #[test]
     fn bottom_layer_leaf_nodes_all_present_in_store() {
-        let height = Height::from(5);
+        let height = Height::expect_from(5);
         let leaf_nodes = sparse_leaves(&height);
 
-        let tree = TreeBuilder::new()
+        let tree = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(&generate_padding_closure())
@@ -454,21 +465,21 @@ mod tests {
 
     #[test]
     fn expected_internal_nodes_are_in_the_store_for_default_store_depth() {
-        let height = Height::from(8);
+        let height = Height::expect_from(8);
         let leaf_nodes = full_bottom_layer(&height);
 
-        let tree = TreeBuilder::new()
-            .with_height(height.clone())
+        let tree = BinaryTreeBuilder::new()
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
 
-        let middle_layer = height.as_raw_int() / 2;
-        let layer_below_root = height.as_raw_int() - 1;
+        let middle_layer = height.as_u8() / 2;
+        let layer_below_root = height.as_u8() - 1;
 
         // These nodes should be in the store.
         for y in middle_layer..layer_below_root {
-            for x in 0..2u64.pow((height.as_raw_int() - y - 1) as u32) {
+            for x in 0..2u64.pow((height.as_u8() - y - 1) as u32) {
                 let coord = Coordinate { x, y };
                 tree.store
                     .get_node(&coord)
@@ -479,7 +490,7 @@ mod tests {
         // These nodes should not be in the store.
         // Why 1 and not 0? Because leaf nodes are checked in another test.
         for y in 1..middle_layer {
-            for x in 0..2u64.pow((height.as_raw_int() - y - 1) as u32) {
+            for x in 0..2u64.pow((height.as_u8() - y - 1) as u32) {
                 let coord = Coordinate { x, y };
                 if tree.store.get_node(&coord).is_some() {
                     panic!("{:?} was expected to not be in the store", coord);
@@ -490,22 +501,22 @@ mod tests {
 
     #[test]
     fn expected_internal_nodes_are_in_the_store_for_custom_store_depth() {
-        let height = Height::from(8);
+        let height = Height::expect_from(8);
         let leaf_nodes = full_bottom_layer(&height);
         // TODO fuzz on this store depth
         let store_depth = 1;
 
-        let tree = TreeBuilder::new()
-            .with_height(height.clone())
+        let tree = BinaryTreeBuilder::new()
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(store_depth)
             .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
 
-        let layer_below_root = height.as_raw_int() - 1;
+        let layer_below_root = height.as_u8() - 1;
 
         // Only the leaf nodes should be in the store.
-        for x in 0..2u64.pow((height.as_raw_int() - 1) as u32) {
+        for x in 0..2u64.pow((height.as_u8() - 1) as u32) {
             let coord = Coordinate { x, y: 0 };
             tree.store
                 .get_node(&coord)
@@ -514,7 +525,7 @@ mod tests {
 
         // All internal nodes should not be in the store.
         for y in 1..layer_below_root {
-            for x in 0..2u64.pow((height.as_raw_int() - y - 1) as u32) {
+            for x in 0..2u64.pow((height.as_u8() - y - 1) as u32) {
                 let coord = Coordinate { x, y };
                 if tree.store.get_node(&coord).is_some() {
                     panic!("{:?} was expected to not be in the store", coord);

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use primitive_types::H256;
 use serde::{Deserialize, Serialize};
 
@@ -8,28 +9,18 @@ use logging_timer::{timer, Level};
 
 use rayon::prelude::*;
 
-use crate::binary_tree::{
-    BinaryTree, Coordinate, Height, InputLeafNode, PathSiblings, TreeBuilder,
+use crate::{
+    binary_tree::{
+        BinaryTree, BinaryTreeBuilder, Coordinate, FullNodeContent, Height, InputLeafNode,
+        PathSiblings,
+    },
+    entity::{Entity, EntityId},
+    inclusion_proof::{AggregationFactor, InclusionProof},
+    kdf, MaxThreadCount, Salt, Secret,
 };
-use crate::entity::{Entity, EntityId};
-use crate::inclusion_proof::{
-    AggregationFactor, InclusionProof, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
-};
-use crate::kdf::generate_key;
-use crate::node_content::FullNodeContent;
-use crate::MaxThreadCount;
-
-mod ndm_smt_secrets;
-pub use ndm_smt_secrets::NdmSmtSecrets;
-
-mod ndm_smt_secrets_parser;
-pub use ndm_smt_secrets_parser::NdmSmtSecretsParser;
 
 mod x_coord_generator;
 pub use x_coord_generator::RandomXCoordGenerator;
-
-mod ndm_smt_config;
-pub use ndm_smt_config::{NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtConfigParserError};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.
@@ -55,14 +46,26 @@ type Content = FullNodeContent;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NdmSmt {
-    secrets: NdmSmtSecrets,
-    tree: BinaryTree<Content>,
+    binary_tree: BinaryTree<Content>,
     entity_mapping: HashMap<EntityId, u64>,
 }
 
 impl NdmSmt {
     /// Constructor.
     ///
+    /// Parameters:
+    /// - `master_secret`:
+    #[doc = include_str!("../shared_docs/master_secret.md")]
+    /// - `salt_b`:
+    #[doc = include_str!("../shared_docs/salt_b.md")]
+    /// - `salt_s`:
+    #[doc = include_str!("../shared_docs/salt_s.md")]
+    /// - `height`:
+    #[doc = include_str!("../shared_docs/height.md")]
+    /// - `max_thread_count`:
+    #[doc = include_str!("../shared_docs/max_thread_count.md")]
+    /// - `entities`:
+    #[doc = include_str!("../shared_docs/entities_vector.md")]
     /// Each element in `entities` is converted to an
     /// [input leaf node] and randomly assigned a position on the
     /// bottom layer of the tree.
@@ -80,27 +83,114 @@ impl NdmSmt {
     ///
     /// [input leaf node]: crate::binary_tree::InputLeafNode
     pub fn new(
-        secrets: NdmSmtSecrets,
+        master_secret: Secret,
+        salt_b: Salt,
+        salt_s: Salt,
         height: Height,
         max_thread_count: MaxThreadCount,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
-        let master_secret_bytes = secrets.master_secret.as_bytes();
-        let salt_b_bytes = secrets.salt_b.as_bytes();
-        let salt_s_bytes = secrets.salt_s.as_bytes();
+        let x_coord_generator = RandomXCoordGenerator::new(&height);
+
+        NdmSmt::new_with_random_x_coord_generator(
+            master_secret,
+            salt_b,
+            salt_s,
+            height,
+            max_thread_count,
+            entities,
+            x_coord_generator,
+        )
+    }
+
+    /// Constructor for testing purposes.
+    ///
+    /// Note: This is **not** cryptographically secure and should only be used
+    /// for testing.
+    ///
+    /// Parameters:
+    /// - `master_secret`:
+    #[doc = include_str!("../shared_docs/master_secret.md")]
+    /// - `salt_b`:
+    #[doc = include_str!("../shared_docs/salt_b.md")]
+    /// - `salt_s`:
+    #[doc = include_str!("../shared_docs/salt_s.md")]
+    /// - `height`:
+    #[doc = include_str!("../shared_docs/height.md")]
+    /// - `max_thread_count`:
+    #[doc = include_str!("../shared_docs/max_thread_count.md")]
+    /// - `entities`:
+    #[doc = include_str!("../shared_docs/entities_vector.md")]
+    /// Each element in `entities` is converted to an
+    /// [input leaf node] and randomly assigned a position on the
+    /// bottom layer of the tree.
+    /// - `seed`: random seed for the x-coord PRNG mapping algorithm.
+    ///
+    /// An [NdmSmtError] is returned if:
+    /// 1. There are more entities than the height allows i.e. more entities
+    /// than would fit on the bottom layer.
+    /// 2. The tree build fails for some reason.
+    /// 3. There are duplicate entity IDs.
+    ///
+    /// The function will panic if there is a problem joining onto a spawned
+    /// thread, or if concurrent variables are not able to be locked. It's not
+    /// clear how to recover from these scenarios because variables may be in
+    /// an unknown state, so rather panic.
+    ///
+    /// [input leaf node]: crate::binary_tree::InputLeafNode
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new_with_random_seed(
+        master_secret: Secret,
+        salt_b: Salt,
+        salt_s: Salt,
+        height: Height,
+        max_thread_count: MaxThreadCount,
+        entities: Vec<Entity>,
+        seed: u64,
+    ) -> Result<Self, NdmSmtError> {
+        let x_coord_generator = RandomXCoordGenerator::new_with_seed(&height, seed);
+
+        NdmSmt::new_with_random_x_coord_generator(
+            master_secret,
+            salt_b,
+            salt_s,
+            height,
+            max_thread_count,
+            entities,
+            x_coord_generator,
+        )
+    }
+
+    fn new_with_random_x_coord_generator(
+        master_secret: Secret,
+        salt_b: Salt,
+        salt_s: Salt,
+        height: Height,
+        max_thread_count: MaxThreadCount,
+        entities: Vec<Entity>,
+        mut x_coord_generator: RandomXCoordGenerator,
+    ) -> Result<Self, NdmSmtError> {
+        let master_secret_bytes = master_secret.as_bytes();
+        let salt_b_bytes = salt_b.as_bytes();
+        let salt_s_bytes = salt_s.as_bytes();
 
         info!(
             "\nCreating NDM-SMT with the following configuration:\n \
              - height: {}\n \
              - number of entities: {}\n \
-             - master secret: 0x{}\n \
+             - master secret: <REDACTED>\n \
              - salt b: 0x{}\n \
              - salt s: 0x{}",
             height.as_u32(),
             entities.len(),
-            master_secret_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
-            salt_b_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
-            salt_s_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+            salt_b_bytes
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
+            salt_s_bytes
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
         );
 
         let (leaf_nodes, entity_coord_tuples) = {
@@ -108,7 +198,6 @@ impl NdmSmt {
 
             let tmr = timer!(Level::Debug; "Entity to leaf node conversion");
 
-            let mut x_coord_generator = RandomXCoordGenerator::from(&height);
             let mut x_coords = Vec::<u64>::with_capacity(entities.len());
 
             for _i in 0..entities.len() {
@@ -125,10 +214,11 @@ impl NdmSmt {
                 .map(|(entity, x_coord)| {
                     // `w` is the letter used in the DAPOL+ paper.
                     let entity_secret: [u8; 32] =
-                        generate_key(None, master_secret_bytes, Some(&x_coord.to_le_bytes()))
+                        kdf::generate_key(None, master_secret_bytes, Some(&x_coord.to_le_bytes()))
                             .into();
-                    let blinding_factor = generate_key(Some(salt_b_bytes), &entity_secret, None);
-                    let entity_salt = generate_key(Some(salt_s_bytes), &entity_secret, None);
+                    let blinding_factor =
+                        kdf::generate_key(Some(salt_b_bytes), &entity_secret, None);
+                    let entity_salt = kdf::generate_key(Some(salt_s_bytes), &entity_secret, None);
 
                     InputLeafNode {
                         content: Content::new_leaf(
@@ -162,7 +252,7 @@ impl NdmSmt {
             entity_mapping.insert(entity.id, x_coord);
         }
 
-        let tree = TreeBuilder::new()
+        let tree = BinaryTreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_max_thread_count(max_thread_count)
@@ -173,8 +263,7 @@ impl NdmSmt {
             ))?;
 
         Ok(NdmSmt {
-            tree,
-            secrets,
+            binary_tree: tree,
             entity_mapping,
         })
     }
@@ -186,38 +275,44 @@ impl NdmSmt {
     /// factor for the range proof, which are both required for the range
     /// proof that is done in the [InclusionProof] constructor.
     ///
-    /// `aggregation_factor` is used to determine how many of the range proofs
+    /// Parameters:
+    /// - `master_secret`:
+    #[doc = include_str!("../shared_docs/master_secret.md")]
+    /// - `salt_b`:
+    #[doc = include_str!("../shared_docs/salt_b.md")]
+    /// - `salt_s`:
+    #[doc = include_str!("../shared_docs/salt_s.md")]
+    /// - `entity_id`: unique ID for the entity that the proof will be generated
+    ///   for.
+    /// - `aggregation_factor` is used to determine how many of the range proofs
     /// are aggregated. Those that do not form part of the aggregated proof
     /// are just proved individually. The aggregation is a feature of the
     /// Bulletproofs protocol that improves efficiency.
-    ///
-    /// `upper_bound_bit_length` is used to determine the upper bound for the
-    /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
-    /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
-    /// some liability. The type is set to `u8` because we are not expected
-    /// to require bounds higher than $2^256$. Note that if the value is set
-    /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
-    /// an Err.
-    pub fn generate_inclusion_proof_with(
+    /// - `upper_bound_bit_length`:
+    #[doc = include_str!("../shared_docs/upper_bound_bit_length.md")]
+    pub fn generate_inclusion_proof(
         &self,
+        master_secret: &Secret,
+        salt_b: &Salt,
+        salt_s: &Salt,
         entity_id: &EntityId,
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
     ) -> Result<InclusionProof, NdmSmtError> {
-        let master_secret_bytes = self.secrets.master_secret.as_bytes();
-        let salt_b_bytes = self.secrets.salt_b.as_bytes();
-        let salt_s_bytes = self.secrets.salt_s.as_bytes();
+        let master_secret_bytes = master_secret.as_bytes();
+        let salt_b_bytes = salt_b.as_bytes();
+        let salt_s_bytes = salt_s.as_bytes();
         let new_padding_node_content =
             new_padding_node_content_closure(*master_secret_bytes, *salt_b_bytes, *salt_s_bytes);
 
         let leaf_node = self
             .entity_mapping
             .get(entity_id)
-            .and_then(|leaf_x_coord| self.tree.get_leaf_node(*leaf_x_coord))
+            .and_then(|leaf_x_coord| self.binary_tree.get_leaf_node(*leaf_x_coord))
             .ok_or(NdmSmtError::EntityIdNotFound)?;
 
         let path_siblings = PathSiblings::build_using_multi_threaded_algorithm(
-            &self.tree,
+            &self.binary_tree,
             &leaf_node,
             new_padding_node_content,
         )?;
@@ -230,36 +325,34 @@ impl NdmSmt {
         )?)
     }
 
-    /// Generate an inclusion proof for the given entity_id.
-    ///
-    /// Use the default values for Bulletproof parameters:
-    /// - `aggregation_factor`: half of all the range proofs are aggregated
-    /// - `upper_bound_bit_length`: 64 (which should be plenty enough for most
-    ///   real-world cases)
-    pub fn generate_inclusion_proof(
-        &self,
-        entity_id: &EntityId,
-    ) -> Result<InclusionProof, NdmSmtError> {
-        self.generate_inclusion_proof_with(
-            entity_id,
-            AggregationFactor::default(),
-            DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
-        )
+    #[doc = include_str!("../shared_docs/root_hash.md")]
+    pub fn root_hash(&self) -> &H256 {
+        &self.binary_tree.root().content.hash
     }
 
-    /// Return the hash digest/bytes of the root node for the binary tree.
-    pub fn root_hash(&self) -> H256 {
-        self.tree.root().content.hash
+    #[doc = include_str!("../shared_docs/root_hash.md")]
+    pub fn root_commitment(&self) -> &RistrettoPoint {
+        &self.binary_tree.root().content.commitment
     }
 
-    /// Return the entity mapping, the x-coord that each entity is mapped to.
+    #[doc = include_str!("../shared_docs/root_liability.md")]
+    pub fn root_liability(&self) -> u64 {
+        self.binary_tree.root().content.liability
+    }
+
+    #[doc = include_str!("../shared_docs/root_blinding_factor.md")]
+    pub fn root_blinding_factor(&self) -> &Scalar {
+        &self.binary_tree.root().content.blinding_factor
+    }
+
+    /// Hash map giving the x-coord that each entity is mapped to.
     pub fn entity_mapping(&self) -> &HashMap<EntityId, u64> {
         &self.entity_mapping
     }
 
-    /// Return the height of the binary tree.
+    #[doc = include_str!("../shared_docs/height.md")]
     pub fn height(&self) -> &Height {
-        self.tree.height()
+        self.binary_tree.height()
     }
 }
 
@@ -279,10 +372,10 @@ fn new_padding_node_content_closure(
         // copying
         let coord_bytes = coord.to_bytes();
         // pad_secret is given as 'w' in the DAPOL+ paper
-        let pad_secret = generate_key(None, &master_secret_bytes, Some(&coord_bytes));
+        let pad_secret = kdf::generate_key(None, &master_secret_bytes, Some(&coord_bytes));
         let pad_secret_bytes: [u8; 32] = pad_secret.into();
-        let blinding_factor = generate_key(Some(&salt_b_bytes), &pad_secret_bytes, None);
-        let salt = generate_key(Some(&salt_s_bytes), &pad_secret_bytes, None);
+        let blinding_factor = kdf::generate_key(Some(&salt_b_bytes), &pad_secret_bytes, None);
+        let salt = kdf::generate_key(Some(&salt_s_bytes), &pad_secret_bytes, None);
         Content::new_pad(blinding_factor.into(), coord, salt.into())
     }
 }
@@ -324,21 +417,24 @@ mod tests {
     #[test]
     fn constructor_works() {
         let master_secret: Secret = 1u64.into();
-        let salt_b: Secret = 2u64.into();
-        let salt_s: Secret = 3u64.into();
-        let secrets = NdmSmtSecrets {
-            master_secret,
-            salt_b,
-            salt_s,
-        };
+        let salt_b: Salt = 2u64.into();
+        let salt_s: Salt = 3u64.into();
 
-        let height = Height::from(4u8);
+        let height = Height::expect_from(4u8);
         let max_thread_count = MaxThreadCount::default();
         let entities = vec![Entity {
             liability: 5u64,
             id: EntityId::from_str("some entity").unwrap(),
         }];
 
-        NdmSmt::new(secrets, height, max_thread_count, entities).unwrap();
+        NdmSmt::new(
+            master_secret,
+            salt_b,
+            salt_s,
+            height,
+            max_thread_count,
+            entities,
+        )
+        .unwrap();
     }
 }

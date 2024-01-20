@@ -1,6 +1,6 @@
 [package]
 name = "dapol"
-version = "0.1.0"
+version = "0.3.0"
 authors = ["Stenton Mayne <stentonian@protonmail.com>"]
 edition = "2021"
 description = "DAPOL+ Proof of Liabilities protocol"
@@ -28,6 +28,9 @@ bench = false
 [dependencies]
 
 primitive-types = { version = "0.12.1", features = ["serde"] } # H256 & U256 (I think parity uses this so maybe we just use that crate instead)
+thiserror = "1.0"
+derive_builder = "0.12.0"
+chrono = "0.4.31"
 
 # crypto
 rand = "0.8.5"
@@ -40,7 +43,6 @@ bulletproofs = "4.0.0"
 curve25519-dalek-ng = "4.1.1"
 
 # concurrency
-thiserror = "1.0"
 displaydoc = "0.2"
 rayon = "1.7.0"
 dashmap = { version = "5.5.3", features = ["serde"] }
@@ -57,12 +59,19 @@ patharg = "0.3.0"
 
 # files & serialization
 serde = { version = "1.0.188", features = ["derive"] }
+serde_with = "3.4.0"
+serde_bytes = "0.11.12"
+serde_json = "1.0.111"
+bincode = "1.3.3"
 toml = "0.8.2"
 csv = "1.3.0"
-serde_bytes = "0.11.12"
-bincode = "1.3.3"
-chrono = "0.4.31"
-derive_builder = "0.12.0"
+
+# fuzzing
+arbitrary = { version = "1", optional = true, features = ["derive"] }
+
+[features]
+fuzzing = ["rand/small_rng", "arbitrary"]
+testing = []
 
 [dev-dependencies]
 criterion = "0.5.0"
@@ -71,13 +80,15 @@ jemallocator = "0.5.4"
 sysinfo = "0.29.11"
 statistical = "1.0.0"
 once_cell = "1.18.0"
+chrono = "0.4.31"
+rand = { version = "0.8.5", features = ["small_rng"] }
 
 [[bench]]
 name = "criterion_benches"
 harness = false
 
 [[bench]]
-name = "large_input_benches"
+name = "manual_benches"
 harness = false
 
 [profile.bench]

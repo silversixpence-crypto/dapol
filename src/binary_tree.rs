@@ -35,16 +35,19 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+mod utils;
+
+mod node_content;
+pub use node_content::{FullNodeContent, HiddenNodeContent, Mergeable};
+
 mod tree_builder;
 pub use tree_builder::multi_threaded;
 pub use tree_builder::{
-    single_threaded, InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH,
+    single_threaded, BinaryTreeBuilder, InputLeafNode, TreeBuildError, MIN_STORE_DEPTH,
 };
 
 mod path_siblings;
 pub use path_siblings::{PathSiblings, PathSiblingsBuildError, PathSiblingsError};
-
-mod utils;
 
 mod height;
 pub use height::{Height, HeightError, MAX_HEIGHT, MIN_HEIGHT};
@@ -118,12 +121,6 @@ pub struct Coordinate {
 pub enum Store<C> {
     MultiThreadedStore(multi_threaded::DashMapStore<C>),
     SingleThreadedStore(single_threaded::HashMapStore<C>),
-}
-
-/// The generic content type of a [Node] must implement this trait to allow 2
-/// sibling nodes to be combined to make a new parent node.
-pub trait Mergeable {
-    fn merge(left_sibling: &Self, right_sibling: &Self) -> Self;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -257,7 +254,9 @@ impl Coordinate {
     /// Return the height for the coordinate.
     /// Why the offset? `y` starts from 0 but height starts from 1.
     fn to_height(&self) -> Height {
-        Height::from(self.y + 1)
+        // Since a) y is a u8 and b) height is also:
+        // there is a small chance this panics.
+        Height::expect_from(self.y + 1)
     }
 
     /// Generate a new bottom-layer leaf coordinate from the given x-coord.
@@ -335,8 +334,18 @@ impl<C: Clone> Store<C> {
             Store::SingleThreadedStore(store) => store.get_node(coord),
         }
     }
+
+    /// Simply delegate the call to the wrapped store.
+    fn len(&self) -> usize {
+        match self {
+            Store::MultiThreadedStore(store) => store.len(),
+            Store::SingleThreadedStore(store) => store.len(),
+        }
+    }
 }
 
+/// We can't use the default Debug implementation because it prints the whole
+/// store.
 impl<C: fmt::Debug + Clone> fmt::Debug for BinaryTree<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "root: {:?}, height: {:?}", self.root, self.height)
@@ -366,9 +375,9 @@ struct MatchedPair<C> {
     right: Node<C>,
 }
 
-impl<C> Sibling<C> {
+impl<C> From<Node<C>> for Sibling<C> {
     /// Move a generic node into the left/right sibling type.
-    fn from_node(node: Node<C>) -> Self {
+    fn from(node: Node<C>) -> Self {
         match node.orientation() {
             NodeOrientation::Left => Sibling::Left(node),
             NodeOrientation::Right => Sibling::Right(node),
@@ -386,29 +395,29 @@ impl<C: Mergeable> MatchedPair<C> {
     }
 }
 
-impl<C> MatchedPair<C> {
+impl<C> From<(Node<C>, Node<C>)> for MatchedPair<C> {
     /// Construct a [MatchedPair] using the 2 given nodes.
     ///
     /// Only build the pair if the 2 nodes are siblings, otherwise panic.
     /// Since this code is only used internally for tree construction, and this
     /// state is unrecoverable, panicking is the best option. It is a sanity
     /// check and should never actually happen unless code is changed.
-    fn from(sibling_a: Node<C>, sibling_b: Node<C>) -> Self {
-        if sibling_b.is_right_sibling_of(&sibling_a) {
+    fn from(siblings: (Node<C>, Node<C>)) -> Self {
+        if siblings.1.is_right_sibling_of(&siblings.0) {
             MatchedPair {
-                left: sibling_a,
-                right: sibling_b,
+                left: siblings.0,
+                right: siblings.1,
             }
-        } else if sibling_b.is_left_sibling_of(&sibling_a) {
+        } else if siblings.1.is_left_sibling_of(&siblings.0) {
             MatchedPair {
-                left: sibling_b,
-                right: sibling_a,
+                left: siblings.1,
+                right: siblings.0,
             }
         } else {
             panic!(
                 "A pair cannot be made from 2 nodes that are not siblings {:?} {:?}",
-                sibling_a.coord.clone(),
-                sibling_b.coord.clone(),
+                siblings.0.coord.clone(),
+                siblings.1.coord.clone(),
             )
         }
     }
@@ -472,7 +481,7 @@ mod tests {
     // TODO fuzz on the one x-coord then calculate the other one from this
     #[test]
     fn is_sibling_of_works() {
-        let height = Height::from(5);
+        let height = Height::expect_from(5);
 
         let x_coord = 16;
         let left_node = single_leaf(x_coord).into_node();
@@ -573,7 +582,7 @@ mod tests {
     fn sibling_from_node_works() {
         let x_coord = 11;
         let right_node = single_leaf(x_coord).into_node();
-        let sibling = Sibling::from_node(right_node);
+        let sibling = Sibling::from(right_node);
         match sibling {
             Sibling::Left(_) => panic!("Node should be a right sibling"),
             Sibling::Right(_) => {}
@@ -581,7 +590,7 @@ mod tests {
 
         let x_coord = 16;
         let left_node = single_leaf(x_coord).into_node();
-        let sibling = Sibling::from_node(left_node);
+        let sibling = Sibling::from(left_node);
         match sibling {
             Sibling::Right(_) => panic!("Node should be a left sibling"),
             Sibling::Left(_) => {}
@@ -597,7 +606,7 @@ mod tests {
         let x_coord = 16;
         let left = single_leaf(x_coord).into_node();
 
-        let pair = MatchedPair::from(left, right);
+        let pair = MatchedPair::from((left, right));
         let parent = pair.merge();
 
         assert_eq!(

@@ -6,7 +6,7 @@ use std::{fmt::Debug, path::PathBuf};
 use log::info;
 
 use crate::binary_tree::{Coordinate, Height, Node, PathSiblings};
-use crate::node_content::{FullNodeContent, HiddenNodeContent};
+use crate::binary_tree::{FullNodeContent, HiddenNodeContent};
 use crate::{read_write_utils, EntityId};
 
 mod individual_range_proof;
@@ -17,11 +17,6 @@ use aggregated_range_proof::AggregatedRangeProof;
 
 mod aggregation_factor;
 pub use aggregation_factor::AggregationFactor;
-
-/// Default upper bound for the range proof in the inclusion proof.
-/// 64 bits should be more than enough bits to represent liabilities for real
-/// world applications such as crypto asset exchange balances.
-pub const DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH: u8 = 64u8;
 
 /// The file extension used when writing serialized binary files.
 const SERIALIZED_PROOF_EXTENSION: &str = "dapolproof";
@@ -78,20 +73,16 @@ pub struct InclusionProof {
 }
 
 impl InclusionProof {
-    /// Generate an inclusion proof from a tree path.
+    /// Generate an inclusion proof from the tree path siblings.
     ///
-    /// `aggregation_factor` is used to determine how many of the range proofs
-    /// are aggregated. Those that do not form part of the aggregated proof
-    /// are just proved individually. The aggregation is a feature of the
-    /// Bulletproofs protocol that improves efficiency.
-    ///
-    /// `upper_bound_bit_length` is used to determine the upper bound for the
-    /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
-    /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
-    /// some liability. The type is set to `u8` because we are not expected
-    /// to require bounds higher than $2^256$. Note that if the value is set
-    /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
-    /// an Err.
+    /// Parameters:
+    /// - `leaf_node`: node for which the inclusion proof must be generated for.
+    /// - `path_siblings`: the sibling nodes of the nodes that form the path
+    /// from leaf to root.
+    /// - `aggregation_factor`:
+    #[doc = include_str!("./shared_docs/aggregation_factor.md")]
+    /// - `upper_bound_bit_length`:
+    #[doc = include_str!("./shared_docs/upper_bound_bit_length.md")]
     pub fn generate(
         leaf_node: Node<FullNodeContent>,
         path_siblings: PathSiblings<FullNodeContent>,
@@ -230,7 +221,11 @@ impl InclusionProof {
     /// An error is returned if
     /// 1. [bincode] fails to serialize the file.
     /// 2. There is an issue opening or writing the file.
-    pub fn serialize(&self, entity_id: &EntityId, dir: PathBuf) -> Result<(), InclusionProofError> {
+    pub fn serialize(
+        &self,
+        entity_id: &EntityId,
+        dir: PathBuf,
+    ) -> Result<PathBuf, InclusionProofError> {
         let mut file_name = entity_id.to_string();
         file_name.push('.');
         file_name.push_str(SERIALIZED_PROOF_EXTENSION);
@@ -238,9 +233,9 @@ impl InclusionProof {
         let path = dir.join(file_name);
         info!("Serializing inclusion proof to path {:?}", path);
 
-        read_write_utils::serialize_to_bin_file(&self, path)?;
+        read_write_utils::serialize_to_bin_file(&self, path.clone())?;
 
-        Ok(())
+        Ok(path)
     }
 
     /// Deserialize the [InclusionProof] structure from a binary file.

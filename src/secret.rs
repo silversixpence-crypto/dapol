@@ -1,9 +1,6 @@
+use serde_with::{DeserializeFromStr, SerializeDisplay};
 use std::convert::From;
-use std::str::FromStr;
-
-use serde::{Serialize, Deserialize};
-
-use crate::kdf::Key;
+use std::fmt;
 
 /// The max size of the secret is 256 bits, but this is a soft limit so it
 /// can be increased if necessary. Note that the underlying array length will
@@ -19,12 +16,12 @@ pub const MAX_LENGTH_BYTES: usize = 32;
 /// data such as a nonce or the blinding factor for a Pedersen commitment.
 ///
 /// The main purpose for this struct is to abstract away the [u8; 32] storage
-/// array and offer functions for moving data as apposed to copying.
+/// array and offer functions for moving data as opposed to copying.
 ///
 /// Currently there is no need for the functionality provided by something like
 /// [primitive_types][U256] or [num256][Uint256] but those are options for
 /// later need be.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, SerializeDisplay, DeserializeFromStr)]
 pub struct Secret([u8; 32]);
 
 impl Secret {
@@ -33,12 +30,30 @@ impl Secret {
     }
 }
 
-impl From<Key> for Secret {
-    fn from(key: Key) -> Self {
+// -------------------------------------------------------------------------------------------------
+// Display (used for serialization).
+
+impl fmt::Display for Secret {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = String::from_utf8_lossy(&self.0);
+        write!(f, "{}", s)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// From for KDF key.
+
+use crate::kdf;
+
+impl From<kdf::Key> for Secret {
+    fn from(key: kdf::Key) -> Self {
         let bytes: [u8; 32] = key.into();
         Secret(bytes)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// From for u64.
 
 impl From<u64> for Secret {
     /// Constructor that takes in a u64.
@@ -49,6 +64,11 @@ impl From<u64> for Secret {
         Secret(arr)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// From for str.
+
+use std::str::FromStr;
 
 impl FromStr for Secret {
     type Err = SecretParserError;
@@ -66,6 +86,9 @@ impl FromStr for Secret {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Into for raw bytes.
 
 impl From<Secret> for [u8; 32] {
     fn from(item: Secret) -> Self {

@@ -8,18 +8,17 @@
 //! long (see large_input_benches.rs).
 
 use std::path::Path;
+use std::str::FromStr;
 
 use criterion::measurement::Measurement;
 use criterion::{criterion_group, criterion_main};
 use criterion::{BenchmarkId, Criterion, SamplingMode};
-use once_cell::sync::Lazy;
 use statistical::*;
 
-use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
-use dapol::{initialize_machine_parallelism, Accumulator};
+use dapol::{DapolConfigBuilder, DapolTree, InclusionProof, Secret};
 
 mod inputs;
-use inputs::{max_thread_counts, num_entities_less_than_eq, tree_heights};
+use inputs::{max_thread_counts_greater_than, num_entities_in_range, tree_heights_in_range};
 
 mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
@@ -27,18 +26,10 @@ use memory_usage_estimation::estimated_total_memory_usage_mb;
 mod utils;
 use utils::{abs_diff, bytes_to_string, system_total_memory_mb};
 
-/// Determines how many runs are done for number of entities.
-/// The higher this value the more runs that are done.
-///
-/// Some of the tree builds can take a few hours, and Criterion does a minimum
-/// of 10 samples per bench. So this value gives us to decide how much of the
-/// num_entities
-static MAX_ENTITIES_FOR_CRITERION_BENCHES: Lazy<u64> = Lazy::new(|| {
-    std::env::var("MAX_ENTITIES_FOR_CRITERION")
-        .unwrap_or("100000".to_string())
-        .parse()
-        .unwrap()
-});
+mod env_vars;
+use env_vars::{
+    LOG_VERBOSITY, MAX_ENTITIES, MAX_HEIGHT, MIN_ENTITIES, MIN_HEIGHT, MIN_TOTAL_THREAD_COUNT,
+};
 
 /// This is required to get jemalloc_ctl to work properly.
 #[global_allocator]
@@ -52,48 +43,54 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
     let epoch = jemalloc_ctl::epoch::mib().unwrap();
     let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
 
-    initialize_machine_parallelism();
+    let master_secret = Secret::from_str("secret").unwrap();
+
+    dapol::initialize_machine_parallelism();
+    dapol::utils::activate_logging(*LOG_VERBOSITY);
 
     let mut group = c.benchmark_group("build_tree");
     // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
     // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
     group.sampling_mode(SamplingMode::Flat);
 
-    for h in tree_heights().iter() {
-        for t in max_thread_counts().iter() {
-            for n in num_entities_less_than_eq(*MAX_ENTITIES_FOR_CRITERION_BENCHES).iter() {
+    for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
+        for t in max_thread_counts_greater_than(*MIN_TOTAL_THREAD_COUNT).into_iter() {
+            for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
                 println!("=============================================================\n");
 
                 // =============================================================
                 // Input validation.
 
                 {
-                    // We attempt to guess the amount of memory that the tree
-                    // build will require, and if that is greater than the
-                    // amount of memory available on the machine then we skip
-                    // the input tuple.
+                    // TODO the python script needs to be run again.
+                    // see memory_usage_estimation.rs for more info.
 
-                    let total_mem = system_total_memory_mb();
-                    let expected_mem = estimated_total_memory_usage_mb(h, n);
+                    // // We attempt to guess the amount of memory that the tree
+                    // // build will require, and if that is greater than the
+                    // // amount of memory available on the machine then we skip
+                    // // the input tuple.
 
-                    if total_mem < expected_mem {
-                        println!(
-                            "Skipping input height_{}/num_entities_{} since estimated memory \
-                                  usage {} is greater than the system max {}",
-                            h.as_u32(),
-                            n,
-                            expected_mem,
-                            total_mem
-                        );
+                    // let total_mem = system_total_memory_mb();
+                    // let expected_mem = estimated_total_memory_usage_mb(&h, &n);
 
-                        continue;
-                    }
+                    // if total_mem < expected_mem {
+                    //     println!(
+                    //         "Skipping input height_{}/num_entities_{} since estimated memory \
+                    //               usage {} is greater than the system max {}",
+                    //         h.as_u32(),
+                    //         n,
+                    //         expected_mem,
+                    //         total_mem
+                    //     );
+
+                    //     continue;
+                    // }
                 }
 
                 // Do not try build the tree if the number of entities exceeds
                 // the maximum number allowed. If this check is not done then
                 // we would get an error on tree build.
-                if n > &h.max_bottom_layer_nodes() {
+                if n > h.max_bottom_layer_nodes() {
                     println!(
                         "Skipping input height_{}/num_entities_{} since number of entities is \
                               greater than max allowed",
@@ -108,7 +105,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 // Tree build.
 
                 let mut memory_readings = vec![];
-                let mut ndm_smt = Option::<NdmSmt>::None;
+                let mut dapol_tree = Option::<DapolTree>::None;
 
                 group.bench_with_input(
                     BenchmarkId::new(
@@ -124,17 +121,20 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                     |bench, tup| {
                         bench.iter(|| {
                             // this is necessary for the memory readings to work
-                            ndm_smt = None;
+                            dapol_tree = None;
 
                             epoch.advance().unwrap();
                             let before = allocated.read().unwrap();
 
-                            ndm_smt = Some(
-                                NdmSmtConfigBuilder::default()
-                                    .height(tup.0.clone())
-                                    .max_thread_count(tup.1.clone())
-                                    .num_random_entities(*tup.2)
+                            dapol_tree = Some(
+                                DapolConfigBuilder::default()
+                                    .accumulator_type(dapol::AccumulatorType::NdmSmt)
+                                    .height(tup.0)
+                                    .max_thread_count(tup.1)
+                                    .num_random_entities(tup.2)
+                                    .master_secret(master_secret.clone())
                                     .build()
+                                    .expect("Unable to build DapolConfig")
                                     .parse()
                                     .expect("Unable to parse NdmSmtConfig"),
                             );
@@ -165,8 +165,8 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 let src_dir = env!("CARGO_MANIFEST_DIR");
                 let target_dir = Path::new(&src_dir).join("target");
                 let dir = target_dir.join("serialized_trees");
-                let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
-                let acc = Accumulator::NdmSmt(ndm_smt.expect("Tree should have been built"));
+                let path = DapolTree::parse_tree_serialization_path(dir).unwrap();
+                let tree = dapol_tree.expect("Tree should have been built");
 
                 group.bench_function(
                     BenchmarkId::new(
@@ -179,7 +179,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                         ),
                     ),
                     |bench| {
-                        bench.iter(|| acc.serialize(path.clone()).unwrap());
+                        bench.iter(|| tree.serialize(path.clone()).unwrap());
                     },
                 );
 
@@ -199,38 +199,45 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 /// We only loop through `tree_heights` & `num_entities` because we want proof
 /// generation to have maximum threads.
 pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
-    let mut group = c.benchmark_group("generate_proof");
-    group.sample_size(20);
+    let mut group = c.benchmark_group("proofs");
 
-    for h in tree_heights().iter() {
-        for n in num_entities_less_than_eq(*MAX_ENTITIES_FOR_CRITERION_BENCHES).iter() {
+    let master_secret = Secret::from_str("secret").unwrap();
+
+    dapol::initialize_machine_parallelism();
+    dapol::utils::activate_logging(*LOG_VERBOSITY);
+
+    for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
+        for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
             {
-                // We attempt to guess the amount of memory that the tree
-                // build will require, and if that is greater than the
-                // amount of memory available on the machine then we skip
-                // the input tuple.
+                // TODO the python script needs to be run again.
+                // see memory_usage_estimation.rs for more info.
 
-                let total_mem = system_total_memory_mb();
-                let expected_mem = estimated_total_memory_usage_mb(h, n);
+                // // We attempt to guess the amount of memory that the tree
+                // // build will require, and if that is greater than the
+                // // amount of memory available on the machine then we skip
+                // // the input tuple.
 
-                if total_mem < expected_mem {
-                    println!(
-                        "Skipping input height_{}/num_entities_{} since estimated memory \
-                                  usage {} is greater than the system max {}",
-                        h.as_u32(),
-                        n,
-                        expected_mem,
-                        total_mem
-                    );
+                // let total_mem = system_total_memory_mb();
+                // let expected_mem = estimated_total_memory_usage_mb(&h, &n);
 
-                    continue;
-                }
+                // if total_mem < expected_mem {
+                //     println!(
+                //         "Skipping input height_{}/num_entities_{} since estimated memory \
+                //                   usage {} is greater than the system max {}",
+                //         h.as_u32(),
+                //         n,
+                //         expected_mem,
+                //         total_mem
+                //     );
+
+                //     continue;
+                // }
             }
 
             // Do not try build the tree if the number of entities exceeds
             // the maximum number allowed. If this check is not done then
             // we would get an error on tree build.
-            if n > &h.max_bottom_layer_nodes() {
+            if n > h.max_bottom_layer_nodes() {
                 println!(
                     "Skipping input height_{}/num_entities_{} since number of entities is \
                               greater than max allowed",
@@ -241,31 +248,59 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
                 continue;
             }
 
-            let ndm_smt = NdmSmtConfigBuilder::default()
-                .height(h.clone())
-                .num_random_entities(*n)
+            let dapol_tree = DapolConfigBuilder::default()
+                .accumulator_type(dapol::AccumulatorType::NdmSmt)
+                .master_secret(master_secret.clone())
+                .height(h)
+                .num_random_entities(n)
                 .build()
+                .expect("Unable to build DapolConfig")
                 .parse()
                 .expect("Unable to parse NdmSmtConfig");
 
-            let entity_id = ndm_smt
+            let entity_id = dapol_tree
                 .entity_mapping()
+                .unwrap()
                 .keys()
                 .next()
                 .expect("Tree should have at least 1 entity");
 
+            let mut proof = Option::<InclusionProof>::None;
+
             group.bench_function(
                 BenchmarkId::new(
-                    "build_tree",
+                    "generate_proof",
                     format!("height_{}/num_entities_{}", h.as_u32(), n),
                 ),
                 |bench| {
                     bench.iter(|| {
-                        let _proof = ndm_smt
-                            .generate_inclusion_proof(entity_id)
-                            .expect("Proof should have been generated successfully");
+                        proof = Some(
+                            dapol_tree
+                                .generate_inclusion_proof(entity_id)
+                                .expect("Proof should have been generated successfully"),
+                        );
                     });
                 },
+            );
+
+            // =============================================================
+            // Proof serialization.
+
+            let src_dir = env!("CARGO_MANIFEST_DIR");
+            let target_dir = Path::new(&src_dir).join("target");
+            let dir = target_dir.join("serialized_proofs");
+            std::fs::create_dir_all(dir.clone()).unwrap();
+            let path = proof
+                .expect("Proof should be set")
+                .serialize(entity_id, dir)
+                .unwrap();
+            let file_size = std::fs::metadata(path)
+                .expect("Unable to get serialized tree metadata for {path}")
+                .len();
+
+            println!(
+                "\nSerialized proof file size: {}\n",
+                bytes_to_string(file_size as usize)
             );
         }
     }
@@ -274,38 +309,45 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 /// We only loop through `tree_heights` & `num_entities` because proof
 /// verification does not depend on number of threads.
 pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
-    let mut group = c.benchmark_group("generate_proof");
-    group.sample_size(20);
+    let mut group = c.benchmark_group("proofs");
 
-    for h in tree_heights().iter() {
-        for n in num_entities_less_than_eq(*MAX_ENTITIES_FOR_CRITERION_BENCHES).iter() {
+    let master_secret = Secret::from_str("secret").unwrap();
+
+    dapol::initialize_machine_parallelism();
+    dapol::utils::activate_logging(*LOG_VERBOSITY);
+
+    for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
+        for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
             {
-                // We attempt to guess the amount of memory that the tree
-                // build will require, and if that is greater than the
-                // amount of memory available on the machine then we skip
-                // the input tuple.
+                // TODO the python script needs to be run again.
+                // see memory_usage_estimation.rs for more info.
 
-                let total_mem = system_total_memory_mb();
-                let expected_mem = estimated_total_memory_usage_mb(h, n);
+                // // We attempt to guess the amount of memory that the tree
+                // // build will require, and if that is greater than the
+                // // amount of memory available on the machine then we skip
+                // // the input tuple.
 
-                if total_mem < expected_mem {
-                    println!(
-                        "Skipping input height_{}/num_entities_{} since estimated memory \
-                                  usage {} is greater than the system max {}",
-                        h.as_u32(),
-                        n,
-                        expected_mem,
-                        total_mem
-                    );
+                // let total_mem = system_total_memory_mb();
+                // let expected_mem = estimated_total_memory_usage_mb(&h, &n);
 
-                    continue;
-                }
+                // if total_mem < expected_mem {
+                //     println!(
+                //         "Skipping input height_{}/num_entities_{} since estimated memory \
+                //                   usage {} is greater than the system max {}",
+                //         h.as_u32(),
+                //         n,
+                //         expected_mem,
+                //         total_mem
+                //     );
+
+                //     continue;
+                // }
             }
 
             // Do not try build the tree if the number of entities exceeds
             // the maximum number allowed. If this check is not done then
             // we would get an error on tree build.
-            if n > &h.max_bottom_layer_nodes() {
+            if n > h.max_bottom_layer_nodes() {
                 println!(
                     "Skipping input height_{}/num_entities_{} since number of entities is \
                               greater than max allowed",
@@ -316,32 +358,36 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
                 continue;
             }
 
-            let ndm_smt = NdmSmtConfigBuilder::default()
-                .height(h.clone())
-                .num_random_entities(*n)
+            let dapol_tree = DapolConfigBuilder::default()
+                .accumulator_type(dapol::AccumulatorType::NdmSmt)
+                .master_secret(master_secret.clone())
+                .height(h)
+                .num_random_entities(n)
                 .build()
+                .expect("Unable to build DapolConfig")
                 .parse()
                 .expect("Unable to parse NdmSmtConfig");
 
-            let root_hash = ndm_smt.root_hash();
+            let root_hash = dapol_tree.root_hash();
 
-            let entity_id = ndm_smt
+            let entity_id = dapol_tree
                 .entity_mapping()
+                .unwrap()
                 .keys()
                 .next()
                 .expect("Tree should have at least 1 entity");
 
-            let proof = ndm_smt
+            let proof = dapol_tree
                 .generate_inclusion_proof(entity_id)
                 .expect("Proof should have been generated successfully");
 
             group.bench_function(
                 BenchmarkId::new(
-                    "build_tree",
+                    "verify_proof",
                     format!("height_{}/num_entities_{}", h.as_u32(), n),
                 ),
                 |bench| {
-                    bench.iter(|| proof.verify(root_hash));
+                    bench.iter(|| proof.verify(*root_hash));
                 },
             );
         }
@@ -356,7 +402,7 @@ use std::time::Duration;
 criterion_group! {
     name = wall_clock_time;
     config = Criterion::default().sample_size(10).measurement_time(Duration::from_secs(600));
-    targets = bench_build_tree, bench_generate_proof, bench_verify_proof,
+    targets = bench_build_tree, bench_generate_proof, bench_verify_proof
 }
 
 // Does not work, see memory_measurement.rs
