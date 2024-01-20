@@ -1,5 +1,7 @@
 //! Utilities used across the whole crate.
 
+// TODO add documentation for traits
+
 // -------------------------------------------------------------------------------------------------
 // Logging.
 

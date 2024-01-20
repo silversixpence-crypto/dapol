@@ -62,7 +62,7 @@
 //! ```
 #![doc = include_str!("../examples/main.rs")]
 //! ```
-//! 
+//!
 //! ### Features
 //!
 //! #### Fuzzing
@@ -81,7 +81,10 @@ pub mod read_write_utils;
 pub mod utils;
 
 mod dapol_tree;
-pub use dapol_tree::{DapolTree, DapolTreeError, RootPublicData, RootSecretData};
+pub use dapol_tree::{
+    DapolTree, DapolTreeError, RootPublicData, RootSecretData, SERIALIZED_ROOT_PUB_FILE_PREFIX,
+    SERIALIZED_ROOT_PVT_FILE_PREFIX, SERIALIZED_TREE_EXTENSION, SERIALIZED_TREE_FILE_PREFIX,
+};
 
 pub use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 

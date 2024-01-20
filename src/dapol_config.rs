@@ -11,7 +11,7 @@ use crate::{
 };
 use crate::{salt, secret};
 
-/// Configuration needed to construct a [crate][DapolTree].
+/// Configuration needed to construct a [DapolTree].
 ///
 /// The config is defined by a struct. A builder pattern is used to construct
 /// the config, but it can also be constructed by deserializing a file.
@@ -21,7 +21,7 @@ use crate::{salt, secret};
 #[doc = include_str!("../examples/dapol_config_example.toml")]
 /// ```
 ///
-/// Example of how to use the builder to construct a [crate][DapolTree]:
+/// Example of how to use the builder to construct a [DapolTree]:
 /// ```
 /// use std::{path::PathBuf, str::FromStr};
 /// use dapol::{
@@ -55,7 +55,7 @@ use crate::{salt, secret};
 ///     .unwrap();
 /// ```
 ///
-/// Example of how to use a config file to construct a [crate][DapolTree]:
+/// Example of how to use a config file to construct a [DapolTree]:
 /// ```
 /// use std::{path::PathBuf, str::FromStr};
 /// use dapol::DapolConfig;
@@ -66,8 +66,8 @@ use crate::{salt, secret};
 /// DapolConfig::deserialize(config_file_path).unwrap();
 /// ```
 ///
-/// Note that you can also construct a [crate][DapolTree] by calling the
-/// constructor directly (see [crate][DapolTree]).
+/// Note that you can also construct a [DapolTree] by calling the
+/// constructor directly (see [DapolTree]).
 #[derive(Deserialize, Debug, Builder, PartialEq)]
 #[builder(build_fn(skip))]
 pub struct DapolConfig {
@@ -346,7 +346,7 @@ impl DapolConfig {
         Ok(config)
     }
 
-    /// Try to construct a [crate][DapolTree] from the config.
+    /// Try to construct a [DapolTree] from the config.
     // STENT TODO rather call this create_tree
     #[cfg(any(test, feature = "testing"))]
     pub fn parse(self) -> Result<DapolTree, DapolConfigError> {
@@ -398,7 +398,7 @@ impl DapolConfig {
         Ok(dapol_tree)
     }
 
-    /// Try to construct a [crate][DapolTree] from the config.
+    /// Try to construct a [DapolTree] from the config.
     // STENT TODO rather call this create_tree
     #[cfg(not(any(test, feature = "testing")))]
     pub fn parse(self) -> Result<DapolTree, DapolConfigError> {
@@ -433,7 +433,7 @@ impl DapolConfig {
         .log_on_err()?)
     }
 
-    /// Open and parse the secrets file, returning a [crate][Secret].
+    /// Open and parse the secrets file, returning a [Secret].
     ///
     /// An error is returned if:
     /// 1. The path is None (i.e. was not set).
@@ -505,7 +505,7 @@ struct DapolSecrets {
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-/// Errors encountered when parsing [crate][DapolConfig].
+/// Errors encountered when parsing [DapolConfig].
 #[derive(thiserror::Error, Debug)]
 pub enum DapolConfigError {
     #[error("Entities parsing failed while trying to parse DAPOL config")]

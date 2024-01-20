@@ -8,17 +8,16 @@ use std::path::PathBuf;
 use crate::{
     accumulators::{Accumulator, AccumulatorType, NdmSmt, NdmSmtError},
     read_write_utils::{self},
-    secret,
     utils::LogOnErr,
     AggregationFactor, Entity, EntityId, Height, InclusionProof, MaxLiability, MaxThreadCount,
     Salt, Secret,
 };
 
-const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
-const SERIALIZED_TREE_FILE_PREFIX: &str = "proof_of_liabilities_merkle_sum_tree_";
+pub const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
+pub const SERIALIZED_TREE_FILE_PREFIX: &str = "proof_of_liabilities_merkle_sum_tree_";
 
-const SERIALIZED_ROOT_PUB_FILE_PREFIX: &str = "public_root_data_";
-const SERIALIZED_ROOT_PVT_FILE_PREFIX: &str = "secret_root_data_";
+pub const SERIALIZED_ROOT_PUB_FILE_PREFIX: &str = "public_root_data_";
+pub const SERIALIZED_ROOT_PVT_FILE_PREFIX: &str = "secret_root_data_";
 
 // -------------------------------------------------------------------------------------------------
 // Main struct.
@@ -27,7 +26,7 @@ const SERIALIZED_ROOT_PVT_FILE_PREFIX: &str = "secret_root_data_";
 ///
 /// This is the top-most module in the hierarchy of the [dapol] crate.
 ///
-/// It is recommended that one use [crate][DapolConfig] to construct the
+/// It is recommended that one use [DapolConfig](crate::DapolConfig) to construct the
 /// tree, which has extra sanity checks on the inputs and more ways to set
 /// the parameters. But there is also a `new` function for direct construction.
 #[derive(Debug, Serialize, Deserialize)]
@@ -89,8 +88,7 @@ impl DapolTree {
     #[doc = include_str!("./shared_docs/salt_s.md")]
     /// - `max_liability`: If not set then a default value is used.
     #[doc = include_str!("./shared_docs/max_liability.md")]
-    /// - `height`: If not set the [default height] will be used
-    ///   [crate][Height].
+    /// - `height`: If not set the [default height] will be used.
     #[doc = include_str!("./shared_docs/height.md")]
     /// - `max_thread_count`: If not set the max parallelism of the underlying
     ///   machine will be used.
@@ -345,7 +343,7 @@ impl DapolTree {
         self.accumulator.height()
     }
 
-    /// Mapping of [crate][EntityId] to x-coord on the bottom layer of the tree.
+    /// Mapping of [EntityId](crate::EntityId) to x-coord on the bottom layer of the tree.
     ///
     /// If the underlying accumulator is an NDM-SMT then a hashmap is returned
     /// otherwise None is returned.
@@ -441,7 +439,7 @@ impl DapolTree {
     /// `path`. 2. Non-existing directory: in this case all dirs in the path
     /// are created, and a default file name is appended.
     /// 3. File in existing dir: in this case the extension is checked to be
-    /// ".[SERIALIZED_TREE_EXTENSION]", then `path` is returned.
+    /// [SERIALIZED_TREE_EXTENSION], then `path` is returned.
     /// 4. File in non-existing dir: dirs in the path are created and the file
     /// extension is checked.
     ///
@@ -507,7 +505,7 @@ impl DapolTree {
     /// `path`. 2. Non-existing directory: in this case all dirs in the path
     /// are created, and a default file name is appended.
     /// 3. File in existing dir: in this case the extension is checked to be
-    /// ".[SERIALIZED_TREE_EXTENSION]", then `path` is returned.
+    /// [SERIALIZED_TREE_EXTENSION], then `path` is returned.
     /// 4. File in non-existing dir: dirs in the path are created and the file
     /// extension is checked.
     ///
@@ -589,7 +587,7 @@ impl DapolTree {
     /// An error is logged and returned if
     /// 1. The file cannot be opened.
     /// 2. The [bincode] deserializer fails.
-    /// 3. The file extension is not ".[SERIALIZED_TREE_EXTENSION]"
+    /// 3. The file extension is not [SERIALIZED_TREE_EXTENSION]
     pub fn deserialize(path: PathBuf) -> Result<DapolTree, DapolTreeError> {
         debug!(
             "Deserializing DapolTree from file {:?}",
@@ -613,7 +611,7 @@ impl DapolTree {
     /// An error is logged and returned if
     /// 1. The file cannot be opened.
     /// 2. The [serde_json] deserializer fails.
-    /// 3. The file extension is not ".[SERIALIZED_ROOT_PUB_FILE_PREFIX]"
+    /// 3. The file extension is not [SERIALIZED_ROOT_PUB_FILE_PREFIX]
     pub fn deserialize_public_root_data(path: PathBuf) -> Result<RootPublicData, DapolTreeError> {
         read_write_utils::check_deserialization_path(&path, "json")?;
 
@@ -630,7 +628,7 @@ impl DapolTree {
     /// An error is logged and returned if
     /// 1. The file cannot be opened.
     /// 2. The [serde_json] deserializer fails.
-    /// 3. The file extension is not ".[SERIALIZED_ROOT_PUB_FILE_PREFIX]"
+    /// 3. The file extension is not [SERIALIZED_ROOT_PUB_FILE_PREFIX]
     pub fn deserialize_secret_root_data(path: PathBuf) -> Result<RootSecretData, DapolTreeError> {
         read_write_utils::check_deserialization_path(&path, "json")?;
 
