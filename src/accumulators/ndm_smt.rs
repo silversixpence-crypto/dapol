@@ -90,6 +90,86 @@ impl NdmSmt {
         max_thread_count: MaxThreadCount,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
+        let x_coord_generator = RandomXCoordGenerator::new(&height);
+
+        NdmSmt::new_with_random_x_coord_generator(
+            master_secret,
+            salt_b,
+            salt_s,
+            height,
+            max_thread_count,
+            entities,
+            x_coord_generator,
+        )
+    }
+
+    /// Constructor for testing purposes.
+    ///
+    /// Note: This is **not** cryptographically secure and should only be used
+    /// for testing.
+    ///
+    /// Parameters:
+    /// - `master_secret`:
+    #[doc = include_str!("../shared_docs/master_secret.md")]
+    /// - `salt_b`:
+    #[doc = include_str!("../shared_docs/salt_b.md")]
+    /// - `salt_s`:
+    #[doc = include_str!("../shared_docs/salt_s.md")]
+    /// - `height`:
+    #[doc = include_str!("../shared_docs/height.md")]
+    /// - `max_thread_count`:
+    #[doc = include_str!("../shared_docs/max_thread_count.md")]
+    /// - `entities`:
+    #[doc = include_str!("../shared_docs/entities_vector.md")]
+    /// Each element in `entities` is converted to an
+    /// [input leaf node] and randomly assigned a position on the
+    /// bottom layer of the tree.
+    /// - `seed`: random seed for the x-coord PRNG mapping algorithm.
+    ///
+    /// An [NdmSmtError] is returned if:
+    /// 1. There are more entities than the height allows i.e. more entities
+    /// than would fit on the bottom layer.
+    /// 2. The tree build fails for some reason.
+    /// 3. There are duplicate entity IDs.
+    ///
+    /// The function will panic if there is a problem joining onto a spawned
+    /// thread, or if concurrent variables are not able to be locked. It's not
+    /// clear how to recover from these scenarios because variables may be in
+    /// an unknown state, so rather panic.
+    ///
+    /// [input leaf node]: crate::binary_tree::InputLeafNode
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new_with_random_seed(
+        master_secret: Secret,
+        salt_b: Salt,
+        salt_s: Salt,
+        height: Height,
+        max_thread_count: MaxThreadCount,
+        entities: Vec<Entity>,
+        seed: u64,
+    ) -> Result<Self, NdmSmtError> {
+        let x_coord_generator = RandomXCoordGenerator::new_with_seed(&height, seed);
+
+        NdmSmt::new_with_random_x_coord_generator(
+            master_secret,
+            salt_b,
+            salt_s,
+            height,
+            max_thread_count,
+            entities,
+            x_coord_generator,
+        )
+    }
+
+    fn new_with_random_x_coord_generator(
+        master_secret: Secret,
+        salt_b: Salt,
+        salt_s: Salt,
+        height: Height,
+        max_thread_count: MaxThreadCount,
+        entities: Vec<Entity>,
+        mut x_coord_generator: RandomXCoordGenerator,
+    ) -> Result<Self, NdmSmtError> {
         let master_secret_bytes = master_secret.as_bytes();
         let salt_b_bytes = salt_b.as_bytes();
         let salt_s_bytes = salt_s.as_bytes();
@@ -118,7 +198,6 @@ impl NdmSmt {
 
             let tmr = timer!(Level::Debug; "Entity to leaf node conversion");
 
-            let mut x_coord_generator = RandomXCoordGenerator::new(&height);
             let mut x_coords = Vec::<u64>::with_capacity(entities.len());
 
             for _i in 0..entities.len() {
@@ -203,7 +282,8 @@ impl NdmSmt {
     #[doc = include_str!("../shared_docs/salt_b.md")]
     /// - `salt_s`:
     #[doc = include_str!("../shared_docs/salt_s.md")]
-    /// - `entity_id`: unique ID for the entity that the proof will be generated for.
+    /// - `entity_id`: unique ID for the entity that the proof will be generated
+    ///   for.
     /// - `aggregation_factor` is used to determine how many of the range proofs
     /// are aggregated. Those that do not form part of the aggregated proof
     /// are just proved individually. The aggregation is a feature of the

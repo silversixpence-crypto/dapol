@@ -1,5 +1,5 @@
 use crate::binary_tree::Height;
-use rand::distributions::{Distribution, Uniform};
+use rand::distributions::{Uniform};
 use std::collections::HashMap;
 
 /// Used for generating unique x-coordinate values on the bottom layer of the
@@ -88,7 +88,11 @@ impl RandomXCoordGenerator {
         }
     }
 
-    #[cfg(any(test, fuzzing))]
+    /// Constructor using random seed.
+    ///
+    /// Note: This is **not** cryptographically secure and should only be
+    /// used for testing.
+    #[cfg(any(test, feature = "fuzzing", feature = "testing"))]
     pub fn new_with_seed(height: &Height, seed: u64) -> Self {
         RandomXCoordGenerator {
             used_x_coords: HashMap::<u64, u64>::new(),
@@ -144,7 +148,7 @@ trait Sampleable {
     fn sample_range(&mut self, lower: u64, upper: u64) -> u64;
 }
 
-#[cfg(not(any(test, fuzzing)))]
+#[cfg(not(any(test, feature = "fuzzing", feature = "testing")))]
 mod rng_selector {
     use rand::distributions::Uniform;
     use rand::{rngs::ThreadRng, thread_rng, Rng};
@@ -167,7 +171,7 @@ mod rng_selector {
     }
 }
 
-#[cfg(any(test, fuzzing))]
+#[cfg(any(test, feature = "fuzzing", feature = "testing"))]
 mod rng_selector {
     use rand::Rng;
     use rand::{rngs::SmallRng, SeedableRng};

@@ -48,7 +48,7 @@ pub struct DapolTree {
 /// to legitimize the proof of liabilities. Without doing this there is no
 /// guarantee to the user that their inclusion proof is checked against the same
 /// data as other users' inclusion proofs.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RootPublicData {
     pub hash: H256,
     pub commitment: RistrettoPoint,
@@ -59,7 +59,7 @@ pub struct RootPublicData {
 /// These are the values that are used to construct the Pedersen commitment.
 /// These values should not be shared if the tree owner does not want to
 /// disclose their total liability.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RootSecretData {
     pub liability: u64,
     pub blinding_factor: Scalar,
@@ -154,6 +154,78 @@ impl DapolTree {
                     height,
                     max_thread_count,
                     entities,
+                )?;
+                Accumulator::NdmSmt(ndm_smt)
+            }
+        };
+
+        let tree = DapolTree {
+            accumulator,
+            master_secret,
+            salt_b: salt_b.clone(),
+            salt_s: salt_s.clone(),
+            max_liability,
+        };
+
+        tree.log_successful_tree_creation();
+
+        Ok(tree)
+    }
+
+    /// Constructor for testing purposes.
+    ///
+    /// Note: This is **not** cryptographically secure and should only be used
+    /// for testing.
+    ///
+    /// An error is returned if the underlying accumulator type construction
+    /// fails.
+    ///
+    /// - `accumulator_type`: This value must be set.
+    #[doc = include_str!("./shared_docs/accumulator_type.md")]
+    /// - `master_secret`: This value is known only to the tree generator, and
+    ///   is used to determine all other secret values needed in the tree. This
+    ///   value must be set.
+    /// - `salt_b`: If not set then it will be randomly generated.
+    #[doc = include_str!("./shared_docs/salt_b.md")]
+    /// - `salt_s`: If not set then it will be randomly generated.
+    #[doc = include_str!("./shared_docs/salt_s.md")]
+    /// - `max_liability`: If not set then a default value is used.
+    #[doc = include_str!("./shared_docs/max_liability.md")]
+    /// - `height`: If not set the [default height] will be used
+    ///   [crate][Height].
+    #[doc = include_str!("./shared_docs/height.md")]
+    /// - `max_thread_count`: If not set the max parallelism of the underlying
+    ///   machine will be used.
+    #[doc = include_str!("./shared_docs/max_thread_count.md")]
+    /// - `secrets_file_path`: Path to the secrets file. If not present the
+    ///   secrets will be generated randomly.
+    /// - `entities`:
+    #[doc = include_str!("./shared_docs/entities_vector.md")]
+    /// - `seed`: random seed for any PRNG used.
+    ///
+    /// [default height]: crate::Height::default
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new_with_random_seed(
+        accumulator_type: AccumulatorType,
+        master_secret: Secret,
+        salt_b: Salt,
+        salt_s: Salt,
+        max_liability: MaxLiability,
+        max_thread_count: MaxThreadCount,
+        height: Height,
+        entities: Vec<Entity>,
+        seed: u64,
+    ) -> Result<Self, DapolTreeError> {
+        let accumulator = match accumulator_type {
+            AccumulatorType::NdmSmt => {
+                let ndm_smt = NdmSmt::new_with_random_seed(
+                    master_secret.clone(),
+                    salt_b.clone(),
+                    salt_s.clone(),
+                    height,
+                    max_thread_count,
+                    entities,
+                    seed,
                 )?;
                 Accumulator::NdmSmt(ndm_smt)
             }
@@ -374,15 +446,6 @@ impl DapolTree {
     /// extension is checked.
     ///
     /// The file prefix is [SERIALIZED_TREE_FILE_PREFIX].
-    ///
-    /// Example:
-    /// ```
-    /// use dapol::DapolTree;
-    /// use std::path::PathBuf;
-    ///
-    /// let dir = PathBuf::from("./");
-    /// let path = DapolTree::parse_tree_serialization_path(dir).unwrap();
-    /// ```
     pub fn parse_tree_serialization_path(
         path: PathBuf,
     ) -> Result<PathBuf, read_write_utils::ReadWriteError> {
@@ -406,15 +469,6 @@ impl DapolTree {
     /// extension is checked.
     ///
     /// The file prefix is [SERIALIZED_ROOT_PUB_FILE_PREFIX].
-    ///
-    /// Example:
-    /// ```
-    /// use dapol::DapolTree;
-    /// use std::path::PathBuf;
-    ///
-    /// let dir = PathBuf::from("./");
-    /// let path = DapolTree::parse_public_root_data_serialization_path(dir).unwrap();
-    /// ```
     pub fn parse_public_root_data_serialization_path(
         path: PathBuf,
     ) -> Result<PathBuf, read_write_utils::ReadWriteError> {
@@ -434,15 +488,6 @@ impl DapolTree {
     /// extension is checked.
     ///
     /// The file prefix is [SERIALIZED_ROOT_PVT_FILE_PREFIX].
-    ///
-    /// Example:
-    /// ```
-    /// use dapol::DapolTree;
-    /// use std::path::PathBuf;
-    ///
-    /// let dir = PathBuf::from("./");
-    /// let path = DapolTree::parse_secret_root_data_serialization_path(dir).unwrap();
-    /// ```
     pub fn parse_secret_root_data_serialization_path(
         path: PathBuf,
     ) -> Result<PathBuf, read_write_utils::ReadWriteError> {
@@ -467,22 +512,6 @@ impl DapolTree {
     /// extension is checked.
     ///
     /// The file prefix is [SERIALIZED_TREE_FILE_PREFIX].
-    ///
-    /// Example:
-    /// ```
-    /// use dapol::{DapolTree, DapolConfig};
-    /// use std::path::Path;
-    ///
-    /// let src_dir = env!("CARGO_MANIFEST_DIR");
-    /// let examples_dir = Path::new(&src_dir).join("examples");
-    ///
-    /// let config_file_path = examples_dir.join("dapol_config_example.toml");
-    /// let dapol_config = DapolConfig::deserialize(config_file_path).unwrap();
-    /// let dapol_tree = dapol_config.parse().unwrap();
-    ///
-    /// let tree_path = examples_dir.join("my_serialized_tree_for_testing.dapoltree");
-    /// let _ = dapol_tree.serialize(tree_path).unwrap();
-    /// ```
     pub fn serialize(&self, path: PathBuf) -> Result<PathBuf, DapolTreeError> {
         let path = DapolTree::parse_tree_serialization_path(path)?;
 
@@ -516,21 +545,6 @@ impl DapolTree {
     /// extension is checked.
     ///
     /// The file prefix is [SERIALIZED_ROOT_PUB_FILE_PREFIX].
-    ///
-    /// Example:
-    /// ```
-    /// use dapol::{DapolTree, DapolConfig};
-    /// use std::path::Path;
-    ///
-    /// let src_dir = env!("CARGO_MANIFEST_DIR");
-    /// let examples_dir = Path::new(&src_dir).join("examples");
-    /// let config_file_path = examples_dir.join("dapol_config_example.toml");
-    /// let dapol_config = DapolConfig::deserialize(config_file_path).unwrap();
-    /// let dapol_tree = dapol_config.parse().unwrap();
-    ///
-    /// let public_root_path = examples_dir.join("public_root_data.json");
-    /// let _ = dapol_tree.serialize_public_root_data(public_root_path).unwrap();
-    /// ```
     pub fn serialize_public_root_data(&self, path: PathBuf) -> Result<PathBuf, DapolTreeError> {
         let public_root_data: RootPublicData = self.public_root_data();
         let path = DapolTree::parse_public_root_data_serialization_path(path.clone())?;
@@ -560,21 +574,6 @@ impl DapolTree {
     /// extension is checked.
     ///
     /// The file prefix is [SERIALIZED_ROOT_PVT_FILE_PREFIX].
-    ///
-    /// Example:
-    /// ```
-    /// use dapol::{DapolTree, DapolConfig};
-    /// use std::path::Path;
-    ///
-    /// let src_dir = env!("CARGO_MANIFEST_DIR");
-    /// let examples_dir = Path::new(&src_dir).join("examples");
-    /// let config_file_path = examples_dir.join("dapol_config_example.toml");
-    /// let dapol_config = DapolConfig::deserialize(config_file_path).unwrap();
-    /// let dapol_tree = dapol_config.parse().unwrap();
-    ///
-    /// let secret_root_path = examples_dir.join("secret_root_data.json");
-    /// let _ = dapol_tree.serialize_secret_root_data(secret_root_path).unwrap();
-    /// ```
     pub fn serialize_secret_root_data(&self, dir: PathBuf) -> Result<PathBuf, DapolTreeError> {
         let secret_root_data: RootSecretData = self.secret_root_data();
         let path = DapolTree::parse_secret_root_data_serialization_path(dir.clone())?;
@@ -591,17 +590,6 @@ impl DapolTree {
     /// 1. The file cannot be opened.
     /// 2. The [bincode] deserializer fails.
     /// 3. The file extension is not ".[SERIALIZED_TREE_EXTENSION]"
-    ///
-    /// Example:
-    /// ```
-    /// use dapol::{DapolTree, DapolConfig};
-    /// use std::path::Path;
-    ///
-    /// let src_dir = env!("CARGO_MANIFEST_DIR");
-    /// let examples_dir = Path::new(&src_dir).join("examples");
-    /// let tree_path = examples_dir.join("my_serialized_tree_for_testing.dapoltree");
-    /// let _ = DapolTree::deserialize(tree_path).unwrap();
-    /// ```
     pub fn deserialize(path: PathBuf) -> Result<DapolTree, DapolTreeError> {
         debug!(
             "Deserializing DapolTree from file {:?}",
@@ -626,18 +614,6 @@ impl DapolTree {
     /// 1. The file cannot be opened.
     /// 2. The [serde_json] deserializer fails.
     /// 3. The file extension is not ".[SERIALIZED_ROOT_PUB_FILE_PREFIX]"
-    ///
-    /// Example:
-    /// ```
-    /// use dapol::DapolTree;
-    /// use std::path::Path;
-    ///
-    /// let src_dir = env!("CARGO_MANIFEST_DIR");
-    /// let examples_dir = Path::new(&src_dir).join("examples");
-    /// let public_root_path = examples_dir.join("public_root_data.json");
-    ///
-    /// let public_root_data = DapolTree::deserialize_public_root_data(public_root_path).unwrap();
-    /// ```
     pub fn deserialize_public_root_data(path: PathBuf) -> Result<RootPublicData, DapolTreeError> {
         read_write_utils::check_deserialization_path(&path, "json")?;
 
@@ -655,18 +631,6 @@ impl DapolTree {
     /// 1. The file cannot be opened.
     /// 2. The [serde_json] deserializer fails.
     /// 3. The file extension is not ".[SERIALIZED_ROOT_PUB_FILE_PREFIX]"
-    ///
-    /// Example:
-    /// ```
-    /// use dapol::DapolTree;
-    /// use std::path::Path;
-    ///
-    /// let src_dir = env!("CARGO_MANIFEST_DIR");
-    /// let examples_dir = Path::new(&src_dir).join("examples");
-    /// let secret_root_path = examples_dir.join("secret_root_data.json");
-    ///
-    /// let secret_root_data = DapolTree::deserialize_secret_root_data(secret_root_path).unwrap();
-    /// ```
     pub fn deserialize_secret_root_data(path: PathBuf) -> Result<RootSecretData, DapolTreeError> {
         read_write_utils::check_deserialization_path(&path, "json")?;
 
@@ -698,50 +662,11 @@ mod tests {
     use super::*;
     use crate::utils::test_utils::assert_err;
     use crate::{
-        accumulators, AccumulatorType, DapolTree, Entity, EntityId, Height, MaxLiability,
-        MaxThreadCount, Salt, Secret,
+        AccumulatorType, DapolTree, Entity, EntityId, Height, MaxLiability, MaxThreadCount, Salt,
+        Secret,
     };
     use std::path::{Path, PathBuf};
     use std::str::FromStr;
-
-    #[test]
-    fn constructor_and_getters_work() {
-        let accumulator_type = AccumulatorType::NdmSmt;
-        let height = Height::expect_from(8);
-        let salt_b = Salt::from_str("salt_b").unwrap();
-        let salt_s = Salt::from_str("salt_s").unwrap();
-        let master_secret = Secret::from_str("master_secret").unwrap();
-        let max_liability = MaxLiability::from(10_000_000);
-        let max_thread_count = MaxThreadCount::from(8);
-
-        let entity = Entity {
-            liability: 1u64,
-            id: EntityId::from_str("id").unwrap(),
-        };
-        let entities = vec![entity.clone()];
-
-        let tree = DapolTree::new(
-            accumulator_type.clone(),
-            master_secret.clone(),
-            salt_b.clone(),
-            salt_s.clone(),
-            max_liability.clone(),
-            max_thread_count.clone(),
-            height.clone(),
-            entities,
-        )
-        .unwrap();
-
-        assert_eq!(tree.master_secret(), &master_secret);
-        assert_eq!(tree.height(), &height);
-        assert_eq!(tree.max_liability(), &max_liability);
-        assert_eq!(tree.salt_b(), &salt_b);
-        assert_eq!(tree.salt_s(), &salt_s);
-        assert_eq!(tree.accumulator_type(), accumulator_type);
-
-        assert!(tree.entity_mapping().is_some());
-        assert!(tree.entity_mapping().unwrap().get(&entity.id).is_some());
-    }
 
     fn new_tree() -> DapolTree {
         let accumulator_type = AccumulatorType::NdmSmt;
@@ -751,6 +676,7 @@ mod tests {
         let master_secret = Secret::from_str("master_secret").unwrap();
         let max_liability = MaxLiability::from(10_000_000);
         let max_thread_count = MaxThreadCount::from(8);
+        let random_seed = 1;
 
         let entity = Entity {
             liability: 1u64,
@@ -758,7 +684,7 @@ mod tests {
         };
         let entities = vec![entity.clone()];
 
-        DapolTree::new(
+        DapolTree::new_with_random_seed(
             accumulator_type.clone(),
             master_secret.clone(),
             salt_b.clone(),
@@ -767,69 +693,209 @@ mod tests {
             max_thread_count.clone(),
             height.clone(),
             entities,
+            random_seed,
         )
         .unwrap()
     }
 
-    #[test]
-    fn serde_does_not_change_tree() {
-        let tree = new_tree();
+    mod construction {
+        use super::*;
 
-        let src_dir = env!("CARGO_MANIFEST_DIR");
-        let examples_dir = Path::new(&src_dir).join("examples");
-        let path = examples_dir.join("my_serialized_tree_for_testing.dapoltree");
-        let path_2 = tree.serialize(path.clone()).unwrap();
-        assert_eq!(path, path_2);
+        #[test]
+        fn constructor_and_getters_work() {
+            let accumulator_type = AccumulatorType::NdmSmt;
+            let height = Height::expect_from(8);
+            let salt_b = Salt::from_str("salt_b").unwrap();
+            let salt_s = Salt::from_str("salt_s").unwrap();
+            let master_secret = Secret::from_str("master_secret").unwrap();
+            let max_liability = MaxLiability::from(10_000_000);
+            let max_thread_count = MaxThreadCount::from(8);
+            let random_seed = 1u64;
 
-        let tree_2 = DapolTree::deserialize(path).unwrap();
+            let entity = Entity {
+                liability: 1u64,
+                id: EntityId::from_str("id").unwrap(),
+            };
+            let entities = vec![entity.clone()];
 
-        assert_eq!(tree.master_secret(), tree_2.master_secret());
-        assert_eq!(tree.height(), tree_2.height());
-        assert_eq!(tree.max_liability(), tree_2.max_liability());
-        assert_eq!(tree.salt_b(), tree_2.salt_b());
-        assert_eq!(tree.salt_s(), tree_2.salt_s());
-        assert_eq!(tree.accumulator_type(), tree_2.accumulator_type());
-        assert_eq!(tree.entity_mapping(), tree_2.entity_mapping());
+            let tree = DapolTree::new_with_random_seed(
+                accumulator_type.clone(),
+                master_secret.clone(),
+                salt_b.clone(),
+                salt_s.clone(),
+                max_liability.clone(),
+                max_thread_count.clone(),
+                height.clone(),
+                entities,
+                random_seed,
+            )
+            .unwrap();
+
+            assert_eq!(tree.master_secret(), &master_secret);
+            assert_eq!(tree.height(), &height);
+            assert_eq!(tree.max_liability(), &max_liability);
+            assert_eq!(tree.salt_b(), &salt_b);
+            assert_eq!(tree.salt_s(), &salt_s);
+            assert_eq!(tree.accumulator_type(), accumulator_type);
+
+            assert!(tree.entity_mapping().is_some());
+            assert!(tree.entity_mapping().unwrap().get(&entity.id).is_some());
+        }
     }
 
-    #[test]
-    fn serialization_path_parser_fails_for_unsupported_extensions() {
-        let path = PathBuf::from_str("./mytree.myext").unwrap();
+    mod serde {
+        use super::*;
 
-        let res = DapolTree::parse_tree_serialization_path(path);
-        assert_err!(
-            res,
-            Err(read_write_utils::ReadWriteError::UnsupportedFileExtension {
-                expected: _,
-                actual: _
-            })
-        );
+        mod tree {
+            use super::*;
+
+            #[test]
+            fn serde_does_not_change_tree() {
+                let tree = new_tree();
+
+                let src_dir = env!("CARGO_MANIFEST_DIR");
+                let examples_dir = Path::new(&src_dir).join("examples");
+                let path = examples_dir.join("my_serialized_tree_for_testing.dapoltree");
+                let path_2 = tree.serialize(path.clone()).unwrap();
+                assert_eq!(path, path_2);
+
+                let tree_2 = DapolTree::deserialize(path).unwrap();
+
+                assert_eq!(tree.master_secret(), tree_2.master_secret());
+                assert_eq!(tree.height(), tree_2.height());
+                assert_eq!(tree.max_liability(), tree_2.max_liability());
+                assert_eq!(tree.salt_b(), tree_2.salt_b());
+                assert_eq!(tree.salt_s(), tree_2.salt_s());
+                assert_eq!(tree.accumulator_type(), tree_2.accumulator_type());
+                assert_eq!(tree.entity_mapping(), tree_2.entity_mapping());
+            }
+
+            #[test]
+            fn serialization_path_parser_fails_for_unsupported_extensions() {
+                let path = PathBuf::from_str("./mytree.myext").unwrap();
+
+                let res = DapolTree::parse_tree_serialization_path(path);
+                assert_err!(
+                    res,
+                    Err(read_write_utils::ReadWriteError::UnsupportedFileExtension {
+                        expected: _,
+                        actual: _
+                    })
+                );
+            }
+
+            #[test]
+            fn serialization_path_parser_gives_correct_file_prefix() {
+                let path = PathBuf::from_str("./").unwrap();
+                let path = DapolTree::parse_tree_serialization_path(path).unwrap();
+                assert!(path
+                    .to_str()
+                    .unwrap()
+                    .contains("proof_of_liabilities_merkle_sum_tree_"));
+            }
+        }
+
+        mod public_root_data {
+            use super::*;
+
+            #[test]
+            fn serde_does_not_change_public_root_data() {
+                let tree = new_tree();
+                let public_root_data = tree.public_root_data();
+
+                let src_dir = env!("CARGO_MANIFEST_DIR");
+                let examples_dir = Path::new(&src_dir).join("examples");
+                let path = examples_dir.join("public_root_data.json");
+                let path_2 = tree.serialize_public_root_data(path.clone()).unwrap();
+                assert_eq!(path, path_2);
+
+                let public_root_data_2 = DapolTree::deserialize_public_root_data(path).unwrap();
+
+                assert_eq!(public_root_data, public_root_data_2);
+            }
+
+            #[test]
+            fn public_root_data_serialization_path_parser_fails_for_unsupported_extensions() {
+                let path = PathBuf::from_str("./public_root_data.myext").unwrap();
+
+                let res = DapolTree::parse_public_root_data_serialization_path(path);
+                assert_err!(
+                    res,
+                    Err(read_write_utils::ReadWriteError::UnsupportedFileExtension {
+                        expected: _,
+                        actual: _
+                    })
+                );
+            }
+
+            #[test]
+            fn public_root_data_serialization_path_parser_gives_correct_file_prefix() {
+                let path = PathBuf::from_str("./").unwrap();
+                let path = DapolTree::parse_public_root_data_serialization_path(path).unwrap();
+                assert!(path.to_str().unwrap().contains("public_root_data_"));
+            }
+        }
+
+        mod secret_root_data {
+            use super::*;
+
+            #[test]
+            fn serde_does_not_change_secret_root_data() {
+                let tree = new_tree();
+                let secret_root_data = tree.secret_root_data();
+
+                let src_dir = env!("CARGO_MANIFEST_DIR");
+                let examples_dir = Path::new(&src_dir).join("examples");
+                let path = examples_dir.join("secret_root_data.json");
+                let path_2 = tree.serialize_secret_root_data(path.clone()).unwrap();
+                assert_eq!(path, path_2);
+
+                let secret_root_data_2 = DapolTree::deserialize_secret_root_data(path).unwrap();
+
+                assert_eq!(secret_root_data, secret_root_data_2);
+            }
+
+            #[test]
+            fn secret_root_data_serialization_path_parser_fails_for_unsupported_extensions() {
+                let path = PathBuf::from_str("./secret_root_data.myext").unwrap();
+
+                let res = DapolTree::parse_secret_root_data_serialization_path(path);
+                assert_err!(
+                    res,
+                    Err(read_write_utils::ReadWriteError::UnsupportedFileExtension {
+                        expected: _,
+                        actual: _
+                    })
+                );
+            }
+
+            #[test]
+            fn secret_root_data_serialization_path_parser_gives_correct_file_prefix() {
+                let path = PathBuf::from_str("./").unwrap();
+                let path = DapolTree::parse_secret_root_data_serialization_path(path).unwrap();
+                assert!(path.to_str().unwrap().contains("secret_root_data_"));
+            }
+        }
     }
 
-    #[test]
-    fn serialization_path_parser_gives_correct_file_prefix() {
-        let path = PathBuf::from_str("./").unwrap();
-        let path = DapolTree::parse_tree_serialization_path(path).unwrap();
-        assert!(path
-            .to_str()
-            .unwrap()
-            .contains("proof_of_liabilities_merkle_sum_tree_"));
-    }
+    mod inclusion_proofs {
+        use super::*;
 
-    #[test]
-    fn generate_inclusion_proof_works() {
-        let tree = new_tree();
-        assert!(tree
-            .generate_inclusion_proof(&EntityId::from_str("id").unwrap())
-            .is_ok());
-    }
+        #[test]
+        fn generate_inclusion_proof_works() {
+            let tree = new_tree();
+            assert!(tree
+                .generate_inclusion_proof(&EntityId::from_str("id").unwrap())
+                .is_ok());
+        }
 
-    #[test]
-    fn generate_inclusion_proof_with_aggregation_factor_works() {
-        let tree = new_tree();
-        let agg = AggregationFactor::Divisor(2u8);
-        assert!(tree
-            .generate_inclusion_proof_with(&EntityId::from_str("id").unwrap(), agg)
-            .is_ok());
+        #[test]
+        fn generate_inclusion_proof_with_aggregation_factor_works() {
+            let tree = new_tree();
+            let agg = AggregationFactor::Divisor(2u8);
+            assert!(tree
+                .generate_inclusion_proof_with(&EntityId::from_str("id").unwrap(), agg)
+                .is_ok());
+        }
     }
 }

@@ -1,5 +1,5 @@
 use derive_builder::Builder;
-use log::{debug, info};
+use log::debug;
 use serde::Deserialize;
 use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
@@ -88,6 +88,9 @@ pub struct DapolConfig {
 
     #[doc = include_str!("./shared_docs/max_thread_count.md")]
     max_thread_count: MaxThreadCount,
+
+    #[builder(setter(custom))]
+    random_seed: Option<u64>,
 
     #[builder(private)]
     entities: EntityConfig,
@@ -220,6 +223,26 @@ impl DapolConfigBuilder {
         self
     }
 
+    /// For seeding any PRNG to have deterministic output.
+    ///
+    /// Note: This is **not** cryptographically secure and should only be used
+    /// for testing.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn random_seed(&mut self, random_seed: u64) -> &mut Self {
+        self.random_seed = Some(Some(random_seed));
+        self
+    }
+
+    #[cfg(any(test, feature = "testing"))]
+    fn get_random_seed(&self) -> Option<u64> {
+        self.random_seed.unwrap_or(None)
+    }
+
+    #[cfg(not(any(test, feature = "testing")))]
+    fn get_random_seed(&self) -> Option<u64> {
+        None
+    }
+
     /// Build the config struct.
     pub fn build(&self) -> Result<DapolConfig, DapolConfigBuilderError> {
         let accumulator_type =
@@ -256,6 +279,7 @@ impl DapolConfigBuilder {
         let height = self.height.unwrap_or_default();
         let max_thread_count = self.max_thread_count.unwrap_or_default();
         let max_liability = self.max_liability.unwrap_or_default();
+        let random_seed = self.get_random_seed();
 
         Ok(DapolConfig {
             accumulator_type,
@@ -266,6 +290,7 @@ impl DapolConfigBuilder {
             max_thread_count,
             entities,
             secrets,
+            random_seed,
         })
     }
 }
@@ -323,6 +348,7 @@ impl DapolConfig {
 
     /// Try to construct a [crate][DapolTree] from the config.
     // STENT TODO rather call this create_tree
+    #[cfg(any(test, feature = "testing"))]
     pub fn parse(self) -> Result<DapolTree, DapolConfigError> {
         debug!("Parsing config to create a new DAPOL tree: {:?}", self);
 
@@ -342,7 +368,59 @@ impl DapolConfig {
             Err(DapolConfigError::CannotFindMasterSecret)
         }?;
 
-        let dapol_tree = DapolTree::new(
+        let dapol_tree = if let Some(random_seed) = self.random_seed {
+            DapolTree::new_with_random_seed(
+                self.accumulator_type,
+                master_secret,
+                salt_b,
+                salt_s,
+                self.max_liability,
+                self.max_thread_count,
+                self.height,
+                entities,
+                random_seed,
+            )
+            .log_on_err()?
+        } else {
+            DapolTree::new(
+                self.accumulator_type,
+                master_secret,
+                salt_b,
+                salt_s,
+                self.max_liability,
+                self.max_thread_count,
+                self.height,
+                entities,
+            )
+            .log_on_err()?
+        };
+
+        Ok(dapol_tree)
+    }
+
+    /// Try to construct a [crate][DapolTree] from the config.
+    // STENT TODO rather call this create_tree
+    #[cfg(not(any(test, feature = "testing")))]
+    pub fn parse(self) -> Result<DapolTree, DapolConfigError> {
+        debug!("Parsing config to create a new DAPOL tree: {:?}", self);
+
+        let salt_b = self.salt_b;
+        let salt_s = self.salt_s;
+
+        let entities = EntitiesParser::new()
+            .with_path_opt(self.entities.file_path)
+            .with_num_entities_opt(self.entities.num_random_entities)
+            .parse_file_or_generate_random()?;
+
+        let master_secret = if let Some(path) = self.secrets.file_path {
+            Ok(DapolConfig::parse_secrets_file(path)?)
+        } else if let Some(master_secret) = self.secrets.master_secret {
+            Ok(master_secret)
+        } else {
+            Err(DapolConfigError::CannotFindMasterSecret)
+        }?;
+
+        Ok(DapolTree::new(
             self.accumulator_type,
             master_secret,
             salt_b,
@@ -352,9 +430,7 @@ impl DapolConfig {
             self.height,
             entities,
         )
-        .log_on_err()?;
-
-        Ok(dapol_tree)
+        .log_on_err()?)
     }
 
     /// Open and parse the secrets file, returning a [crate][Secret].
@@ -722,7 +798,10 @@ mod tests {
                 .parse()
                 .unwrap();
 
-            assert_eq!(dapol_tree.entity_mapping().unwrap().len(), num_entities as usize);
+            assert_eq!(
+                dapol_tree.entity_mapping().unwrap().len(),
+                num_entities as usize
+            );
             assert_eq!(dapol_tree.accumulator_type(), AccumulatorType::NdmSmt);
             assert_eq!(*dapol_tree.height(), height);
             assert_eq!(*dapol_tree.master_secret(), master_secret);
@@ -747,7 +826,10 @@ mod tests {
                 .parse()
                 .unwrap();
 
-            assert_eq!(dapol_tree.entity_mapping().unwrap().len(), num_random_entities as usize);
+            assert_eq!(
+                dapol_tree.entity_mapping().unwrap().len(),
+                num_random_entities as usize
+            );
         }
 
         #[test]

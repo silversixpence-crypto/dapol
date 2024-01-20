@@ -58,11 +58,11 @@ fn main() {
     let dapol_tree_1 = DapolTree::deserialize(serialization_path).unwrap();
 
     let public_root_path = examples_dir.join("public_root_data.json");
-    let _ = dapol_tree_1.serialize_public_root_data(public_root_path.clone()).unwrap();
+    // let _ = dapol_tree_1.serialize_public_root_data(public_root_path.clone()).unwrap();
     let public_root_data = DapolTree::deserialize_public_root_data(public_root_path).unwrap();
 
     let secret_root_path = examples_dir.join("secret_root_data.json");
-    let _ = dapol_tree_1.serialize_secret_root_data(secret_root_path.clone()).unwrap();
+    // let _ = dapol_tree_1.serialize_secret_root_data(secret_root_path.clone()).unwrap();
     let secret_root_data = DapolTree::deserialize_secret_root_data(secret_root_path).unwrap();
 
     // =========================================================================
