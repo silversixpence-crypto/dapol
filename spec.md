@@ -1,23 +1,57 @@
 # Spec for dapol codebase
 
+DAPOL+ protocol introduced in the "Generalized Proof of Liabilities" by Yan Ji and Konstantinos Chalkias ACM CCS 2021 paper, available [here](https://eprint.iacr.org/2021/1350).
+
 The implementation is written in Rust due to a) the readily available libraries for Bulletproofs & other ZK crypto, and b) the performance benefits, as building the tree is an expensive computation for real-world input sizes.
 
 **Key:**
 - Entity (aka user) - Represents a single unit of the external data that is to be modeled by the PoL. Each entity has an ID ($\text{id}_u$) and a liability ($l_u$).
-- $\mathcal{P}$ - constructor of the tree
+- $\mathcal{P}$ - constructor of the tree (aka prover)
 - PBB - (public bulletin board)
 
 ## PoL data, functions & parameters
 
 ### Functions
 
-TODO say which functions these map to in the code
-functions from paper:
-- Setup: produces the root hash & commitment
-- ProveTot: reveal the blinding factor and the liability sum
-- VerifyTot: not included in code
-- Prove: inclusion proof generation
-- Verify: verify inclusion proof
+Functions from paper and their equivalents in the code:
+
+#### Setup
+
+**Output**: produces the Public Data (root hash, root commitment) & Secret Data (master secret, leaf node mapping** tuples
+
+**Code equivalents**:
+- `DapolTree::public_root_data`, which is made up of these 2:
+  - `DapolTree::root_hash`
+  - `DapolTree::root_commitment`
+- `DapolTree::master_secret`
+- `DapolTree::entity_mapping`
+
+#### ProveTot
+
+**Output**: reveals the blinding factor and the liability sum
+
+**Code equivalents**:
+- `DapolTree::secret_root_data`, which is made up of these 2:
+  - `DapolTree::root_liability`
+  - `DapolTree::root_blinding_factor**
+
+#### VerifyTot
+
+**Output**: checks that Public Data corresponds to the Secret Data
+
+**Code equivalent**: `DapolTree::verify_root_commitment`
+
+#### Prove
+
+**Output**: inclusion proof generation for an entity
+
+**Code equivalent**: `DapolTree::generate_inclusion_proof`
+
+#### Verify
+
+**Output**: verify inclusion proof
+
+**Code equivalent**: `InclusionProof::verify`
 
 ### Public parameters
 
