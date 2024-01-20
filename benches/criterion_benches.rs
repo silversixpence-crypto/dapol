@@ -289,6 +289,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
             let src_dir = env!("CARGO_MANIFEST_DIR");
             let target_dir = Path::new(&src_dir).join("target");
             let dir = target_dir.join("serialized_proofs");
+            std::fs::create_dir_all(dir)?;
             let path = proof
                 .expect("Proof should be set")
                 .serialize(entity_id, dir)
