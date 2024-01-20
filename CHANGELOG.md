@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## v0.3.0 (2024-01-20)
+
+- Adjust API to read better using DapolTree instead of Accumulator [36dd58f](https://github.com/silversixpence-crypto/dapol/commit/36dd58fcd9cd2100ac7a1c4a7010faab3397770f). Also included in this change:
+  - New Salt abstraction type [5c8a580](https://github.com/silversixpence-crypto/dapol/commit/5c8a580c5250a337592951234879852a8f1df285)
+  - New MaxLiability abstraction type [800b0a9](https://github.com/silversixpence-crypto/dapol/commit/800b0a95b67ad7b4badf4c089b2cfc10d400283b)
+  - Deserialize Salt & Secret using FromStr [169cfa5](https://github.com/silversixpence-crypto/dapol/commit/169cfa532e86e3f27d675764d8456fc3e3270564)
+  - Fix bug with Bulletproofs bit length [f2a2498](https://github.com/silversixpence-crypto/dapol/commit/f2a2498120fa35ecf589f43bc660d218ae2861ad)
+- Add benchmark graphs to readme [4a73d3c](https://github.com/silversixpence-crypto/dapol/commit/4a73d3cb8284f7f60659a376fa90c5714368e627)
+
 ## v0.2.0 (2023-12-27)
 
 - Add max_thread_count API parameter [62be10c](https://github.com/silversixpence-crypto/dapol/commit/62be10c9393b2b7e2a4feeedde53fd8a793cbf30)

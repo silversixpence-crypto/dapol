@@ -22,7 +22,7 @@
 //! [super][tree_builder][single_threaded].
 
 use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_STORE_DEPTH};
-use crate::{utils::Consume, binary_tree::multi_threaded::RecursionParamsBuilder};
+use crate::{binary_tree::multi_threaded::RecursionParamsBuilder, utils::Consume};
 
 use std::fmt::Debug;
 

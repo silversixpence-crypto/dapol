@@ -405,7 +405,9 @@ mod tests {
     fn err_when_parent_builder_height_not_set() {
         let height = Height::expect_from(4);
         let leaf_nodes = full_bottom_layer(&height);
-        let res = BinaryTreeBuilder::new().with_leaf_nodes(leaf_nodes).height();
+        let res = BinaryTreeBuilder::new()
+            .with_leaf_nodes(leaf_nodes)
+            .height();
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoHeightProvided));

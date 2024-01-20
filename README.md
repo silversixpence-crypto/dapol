@@ -20,8 +20,10 @@ use as is. The code has _not_ been audited yet (as of Nov 2023) and so it is not
 Important tasks still to be done:
 - Write a spec: https://github.com/silversixpence-crypto/dapol/issues/17
 - Support the Deterministic mapping SMT accumulator type: https://github.com/silversixpence-crypto/dapol/issues/9
-- Fuzz some of the unit tests: https://github.com/silversixpence-crypto/dapol/issues/46
 - Sort out version issues with dependencies: https://github.com/silversixpence-crypto/dapol/issues/11
+- Allow the tree to be updatable: https://github.com/silversixpence-crypto/dapol/issues/109
+- Finish integration tests: https://github.com/silversixpence-crypto/dapol/issues/42
+- Use a database as the backend storage system (as opposed to memory): https://github.com/silversixpence-crypto/dapol/issues/44
 
 ## How this code can be used
 

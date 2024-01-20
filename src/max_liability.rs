@@ -128,4 +128,21 @@ mod tests {
             .find(|i| **i == pow_2)
             .is_some());
     }
+
+    #[test]
+    fn upper_bound_bit_length_works_for_100() {
+        let input_max_liability = 100u64;
+        let max_liability = MaxLiability(input_max_liability);
+
+        let logarithm_of_input_truncated = (input_max_liability as f64).log2() as u8;
+        assert_eq!(logarithm_of_input_truncated, 6u8);
+        let nearest_pow_2_greater_than = 8u8;
+
+        assert_eq!(
+            max_liability.as_range_proof_upper_bound_bit_length(),
+            nearest_pow_2_greater_than
+        );
+    }
+
+    // TODO test more cases for the upper_bound_bit_length function
 }

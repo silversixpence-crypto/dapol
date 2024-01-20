@@ -3,9 +3,9 @@ use rand::{
     distributions::{Alphanumeric, DistString},
     thread_rng,
 };
-use serde::Serialize;
-use serde_with::DeserializeFromStr;
+use serde_with::{DeserializeFromStr, SerializeDisplay};
 use std::convert::From;
+use std::fmt;
 
 /// The max size of the salt is 256 bits, but this is a soft limit so it
 /// can be increased if necessary. Note that the underlying array length will
@@ -28,7 +28,7 @@ const STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here b
 /// Currently there is no need for the functionality provided by something like
 /// [primitive_types][U256] or [num256][Uint256] but those are options for
 /// later need be.
-#[derive(Debug, Clone, PartialEq, Serialize, DeserializeFromStr)]
+#[derive(Debug, Clone, PartialEq, SerializeDisplay, DeserializeFromStr)]
 pub struct Salt([u8; 32]);
 
 impl Salt {
@@ -42,6 +42,16 @@ impl Salt {
         let mut rng = thread_rng();
         let random_str = Alphanumeric.sample_string(&mut rng, MAX_LENGTH_BYTES);
         Salt::from_str(&random_str).expect(STRING_CONVERSION_ERR_MSG)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Display (used for serialization).
+
+impl fmt::Display for Salt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = String::from_utf8_lossy(&self.0);
+        write!(f, "{}", s)
     }
 }
 

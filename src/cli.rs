@@ -13,7 +13,7 @@ use crate::{
     accumulators::AccumulatorType,
     binary_tree::Height,
     percentage::{Percentage, ONE_HUNDRED_PERCENT},
-    MaxLiability, MaxThreadCount, Salt
+    MaxLiability, MaxThreadCount, Salt,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -54,6 +54,11 @@ pub enum Command {
 
         #[arg(short = 'S', long, value_name = "FILE_PATH", global = true, long_help = SERIALIZE_HELP)]
         serialize: Option<OutputArg>,
+
+        /// Serialize the root node to 2 files: one for the public data, and
+        /// one for the secret data.
+        #[arg(short, long, value_name = "DIR", global = true)]
+        root_serialize: Option<OutputArg>,
     },
 
     /// Generate inclusion proofs for entities.
@@ -86,15 +91,29 @@ pub enum Command {
 
     /// Verify an inclusion proof.
     ///
-    /// The root hash of the tree is logged out on tree creation (an info-level log).
-    VerifyProof {
-        /// File path for the serialized inclusion proof json file.
+    /// Note: the root hash of the tree is logged out on tree creation (an
+    /// info-level log).
+    VerifyInclusionProof {
+        /// File path for the serialized inclusion proof file.
         #[arg(short, long)]
         file_path: InputArg,
 
         /// Hash digest/bytes for the root node of the tree.
         #[arg(short, long, value_parser = H256::from_str, value_name = "BYTES")]
         root_hash: H256,
+    },
+
+    /// Verify the root node of a DAPOL tree.
+    ///
+    /// Note: the public data (commitment &)
+    VerifyRoot {
+        /// File path for the serialized public data of the root.
+        #[arg(short, long)]
+        root_pub: InputArg,
+
+        /// File path for the serialized secret data of the root.
+        #[arg(short, long)]
+        root_pvt: InputArg,
     },
 }
 

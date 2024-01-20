@@ -160,7 +160,7 @@ fn main() {
                 let src_dir = env!("CARGO_MANIFEST_DIR");
                 let target_dir = Path::new(&src_dir).join("target");
                 let dir = target_dir.join("serialized_trees");
-                let path = DapolTree::parse_serialization_path(dir).unwrap();
+                let path = DapolTree::parse_tree_serialization_path(dir).unwrap();
 
                 let time_start = Instant::now();
                 dapol_tree

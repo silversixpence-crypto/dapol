@@ -1,8 +1,10 @@
 //! Example of a full PoL workflow.
 //!
 //! 1. Build a tree
-//! 2. Generate an inclusion proof
-//! 3. Verify an inclusion proof
+//! 2. Serialize tree & root node
+//! 3. Verify a root node
+//! 4. Generate an inclusion proof
+//! 5. Verify an inclusion proof
 //!
 //! At the time of writing (Nov 2023) only the NDM-SMT accumulator is supported
 //! so this is the only type of tree that is used in this example.
@@ -14,6 +16,7 @@ extern crate clap_verbosity_flag;
 extern crate csv;
 extern crate dapol;
 
+use dapol::DapolTree;
 use dapol::utils::LogOnErrUnwrap;
 
 fn main() {
@@ -43,6 +46,29 @@ fn main() {
 
     // Since the mappings are not the same the root hashes won't be either.
     assert_ne!(dapol_tree_1.root_hash(), dapol_tree_2.root_hash());
+
+    // =========================================================================
+    // (De)serialization.
+
+    let src_dir = env!("CARGO_MANIFEST_DIR");
+    let examples_dir = Path::new(&src_dir).join("examples");
+    let serialization_path = examples_dir.join("my_serialized_tree_for_testing.dapoltree");
+    let _ = dapol_tree_1.serialize(serialization_path.clone()).unwrap();
+
+    let dapol_tree_1 = DapolTree::deserialize(serialization_path).unwrap();
+
+    let public_root_path = examples_dir.join("public_root_data.json");
+    // let _ = dapol_tree_1.serialize_public_root_data(public_root_path.clone()).unwrap();
+    let public_root_data = DapolTree::deserialize_public_root_data(public_root_path).unwrap();
+
+    let secret_root_path = examples_dir.join("secret_root_data.json");
+    // let _ = dapol_tree_1.serialize_secret_root_data(secret_root_path.clone()).unwrap();
+    let secret_root_data = DapolTree::deserialize_secret_root_data(secret_root_path).unwrap();
+
+    // =========================================================================
+    // Root node verification.
+
+    DapolTree::verify_root_commitment(&public_root_data.commitment, &secret_root_data).unwrap();
 
     // =========================================================================
     // Inclusion proof generation & verification.
@@ -123,7 +149,7 @@ pub fn simple_inclusion_proof_generation_and_verification(
     entity_id: dapol::EntityId,
 ) {
     let inclusion_proof = dapol_tree.generate_inclusion_proof(&entity_id).unwrap();
-    inclusion_proof.verify(dapol_tree.root_hash()).unwrap();
+    inclusion_proof.verify(dapol_tree.root_hash().clone()).unwrap();
 }
 
 /// Example on how to generate and verify inclusion proofs.
@@ -146,5 +172,5 @@ pub fn advanced_inclusion_proof_generation_and_verification(
         .generate_inclusion_proof_with(&entity_id, aggregation_factor)
         .unwrap();
 
-    inclusion_proof.verify(dapol_tree.root_hash()).unwrap();
+    inclusion_proof.verify(dapol_tree.root_hash().clone()).unwrap();
 }

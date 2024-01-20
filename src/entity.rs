@@ -24,7 +24,7 @@ pub use entity_ids_parser::{EntityIdsParser, EntityIdsParserError};
 /// chosen above 'user' because it has a more general connotation.
 ///
 /// The entity struct has only 2 fields: ID and liability.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Entity {
     pub liability: u64,
     pub id: EntityId,

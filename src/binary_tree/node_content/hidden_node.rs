@@ -1,6 +1,8 @@
-//! An implementation of the content generic type required for [crate][binary_tree][`Node<C>`].
+//! An implementation of the content generic type required for
+//! [crate][binary_tree][`Node<C>`].
 //!
-//! This implementation contains only the Pedersen commitment and the hash as fields in the struct.
+//! This implementation contains only the Pedersen commitment and the hash as
+//! fields in the struct.
 
 use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
@@ -38,12 +40,13 @@ impl HiddenNodeContent {
 
     /// Create the content for a leaf node.
     ///
-    /// The secret `value` realistically does not need more space than 64 bits because it is
-    /// generally used for monetary value or head count, also the Bulletproofs library requires
-    /// the value to be u64.
-    /// The `blinding_factor` needs to have a larger sized storage space (256 bits) ensure promised
-    /// n-bit security of the commitments; it can be enlarged to 512 bits if need be as this size
-    /// is supported by the underlying `Scalar` constructors.
+    /// The secret `value` realistically does not need more space than 64 bits
+    /// because it is generally used for monetary value or head count, also
+    /// the Bulletproofs library requires the value to be u64.
+    /// The `blinding_factor` needs to have a larger sized storage space (256
+    /// bits) ensure promised n-bit security of the commitments; it can be
+    /// enlarged to 512 bits if need be as this size is supported by the
+    /// underlying `Scalar` constructors.
     #[allow(dead_code)]
     pub fn new_leaf(
         liability: u64,
@@ -51,7 +54,8 @@ impl HiddenNodeContent {
         entity_id: EntityId,
         entity_salt: Secret,
     ) -> HiddenNodeContent {
-        // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
+        // Compute the Pedersen commitment to the value `P = g_1^value *
+        // g_2^blinding_factor`
         let commitment = PedersenGens::default().commit(
             Scalar::from(liability),
             Scalar::from_bytes_mod_order(blinding_factor.into()),
@@ -72,8 +76,9 @@ impl HiddenNodeContent {
 
     /// Create the content for a new padding node.
     ///
-    /// The hash requires the node's coordinate as well as a salt. Since the liability of a
-    /// padding node is 0 only the blinding factor is required for the Pedersen commitment.
+    /// The hash requires the node's coordinate as well as a salt. Since the
+    /// liability of a padding node is 0 only the blinding factor is
+    /// required for the Pedersen commitment.
     #[allow(dead_code)]
     pub fn new_pad(blinding_factor: Secret, coord: &Coordinate, salt: Secret) -> HiddenNodeContent {
         // Compute the Pedersen commitment to 0 `P = g_1^0 * g_2^blinding_factor`
@@ -111,7 +116,8 @@ impl Mergeable for HiddenNodeContent {
     /// Returns the parent node content by merging two child node contents.
     ///
     /// The commitment of the parent is the homomorphic sum of the two children.
-    /// The hash of the parent is computed by hashing the concatenated commitments and hashes of two children.
+    /// The hash of the parent is computed by hashing the concatenated
+    /// commitments and hashes of two children.
     fn merge(left_sibling: &Self, right_sibling: &Self) -> Self {
         let parent_commitment = left_sibling.commitment + right_sibling.commitment;
 
