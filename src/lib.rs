@@ -22,11 +22,13 @@
 //! This project is currently still a work in progress, but is ready for
 //! use as is. The code has _not_ been audited yet (as of Nov 2023). Progress can be tracked [here](https://github.com/silversixpence-crypto/dapol/issues/91).
 //!
-//! A Rust crate has not been released yet, progress can be tracked [here](https://github.com/silversixpence-crypto/dapol/issues/13).
-//!
-//! A spec for this code still needs to be [written](https://github.com/silversixpence-crypto/dapol/issues/17).
-//!
-//! A fuzzing technique should be used for the unit [tests](https://github.com/silversixpence-crypto/dapol/issues/46).
+//! Important tasks still to be done:
+//! - [Write a spec](https://github.com/silversixpence-crypto/dapol/issues/17)
+//! - [Support the Deterministic mapping SMT accumulator type](https://github.com/silversixpence-crypto/dapol/issues/9)
+//! - [Sort out version issues with dependencies](https://github.com/silversixpence-crypto/dapol/issues/11)
+//! - [Allow the tree to be updatable](https://github.com/silversixpence-crypto/dapol/issues/109)
+//! - [Finish integration tests](https://github.com/silversixpence-crypto/dapol/issues/42)
+//! - [Use a database as the backend storage system](https://github.com/silversixpence-crypto/dapol/issues/44) (as opposed to memory)
 //!
 //! Performance can be [improved](https://github.com/silversixpence-crypto/dapol/issues/44).
 //!
@@ -43,7 +45,7 @@
 //!
 //! ### Rust API
 //!
-//! The library has not been released as a crate yet (as of Nov 2023) but the API has the following capabilities:
+//! The API has the following capabilities:
 //! - build a tree using the builder pattern or a configuration file
 //! - generate inclusion proofs from a list of entity IDs (tree required)
 //! - verify an inclusion proof using a root hash (no tree required)

@@ -17,8 +17,8 @@ use crate::{
 const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
 const SERIALIZED_TREE_FILE_PREFIX: &str = "proof_of_liabilities_merkle_sum_tree_";
 
-const SERIALIZED_ROOT_PUB_FILE_PREFIX: &str = "root_public_data_";
-const SERIALIZED_ROOT_PVT_FILE_PREFIX: &str = "root_secret_data_";
+const SERIALIZED_ROOT_PUB_FILE_PREFIX: &str = "public_root_data_";
+const SERIALIZED_ROOT_PVT_FILE_PREFIX: &str = "secret_root_data_";
 
 // -------------------------------------------------------------------------------------------------
 // Main struct.
@@ -224,11 +224,11 @@ impl DapolTree {
     /// otherwise true.
     pub fn verify_root_commitment(
         public_commitment: &RistrettoPoint,
-        root_secret_data: &RootSecretData,
+        secret_root_data: &RootSecretData,
     ) -> Result<(), DapolTreeError> {
         let commitment = PedersenGens::default().commit(
-            Scalar::from(root_secret_data.liability),
-            root_secret_data.blinding_factor,
+            Scalar::from(secret_root_data.liability),
+            secret_root_data.blinding_factor,
         );
 
         if commitment == *public_commitment {
@@ -288,7 +288,7 @@ impl DapolTree {
     ///
     /// These values can be made public and do not disclose secret information
     /// about the tree such as the number of leaf nodes or their liabilities.
-    pub fn root_public_data(&self) -> RootPublicData {
+    pub fn public_root_data(&self) -> RootPublicData {
         RootPublicData {
             hash: self.root_hash().clone(),
             commitment: self.root_commitment().clone(),
@@ -300,7 +300,7 @@ impl DapolTree {
     ///
     /// Neither of these values should be made public if the owner of the tree
     /// does not want to disclose the total liability sum of their users.
-    pub fn root_secret_data(&self) -> RootSecretData {
+    pub fn secret_root_data(&self) -> RootSecretData {
         RootSecretData {
             liability: self.root_liability(),
             blinding_factor: self.root_blinding_factor().clone(),
@@ -413,9 +413,9 @@ impl DapolTree {
     /// use std::path::PathBuf;
     ///
     /// let dir = PathBuf::from("./");
-    /// let path = DapolTree::parse_root_public_data_serialization_path(dir).unwrap();
+    /// let path = DapolTree::parse_public_root_data_serialization_path(dir).unwrap();
     /// ```
-    pub fn parse_root_public_data_serialization_path(
+    pub fn parse_public_root_data_serialization_path(
         path: PathBuf,
     ) -> Result<PathBuf, read_write_utils::ReadWriteError> {
         read_write_utils::parse_serialization_path(path, "json", SERIALIZED_ROOT_PUB_FILE_PREFIX)
@@ -441,9 +441,9 @@ impl DapolTree {
     /// use std::path::PathBuf;
     ///
     /// let dir = PathBuf::from("./");
-    /// let path = DapolTree::parse_root_secret_data_serialization_path(dir).unwrap();
+    /// let path = DapolTree::parse_secret_root_data_serialization_path(dir).unwrap();
     /// ```
-    pub fn parse_root_secret_data_serialization_path(
+    pub fn parse_secret_root_data_serialization_path(
         path: PathBuf,
     ) -> Result<PathBuf, read_write_utils::ReadWriteError> {
         read_write_utils::parse_serialization_path(path, "json", SERIALIZED_ROOT_PVT_FILE_PREFIX)
@@ -528,12 +528,12 @@ impl DapolTree {
     /// let dapol_config = DapolConfig::deserialize(config_file_path).unwrap();
     /// let dapol_tree = dapol_config.parse().unwrap();
     ///
-    /// let public_root_path = examples_dir.join("root_public_data.json");
+    /// let public_root_path = examples_dir.join("public_root_data.json");
     /// let _ = dapol_tree.serialize_public_root_data(public_root_path).unwrap();
     /// ```
     pub fn serialize_public_root_data(&self, path: PathBuf) -> Result<PathBuf, DapolTreeError> {
-        let public_root_data: RootPublicData = self.root_public_data();
-        let path = DapolTree::parse_root_public_data_serialization_path(path.clone())?;
+        let public_root_data: RootPublicData = self.public_root_data();
+        let path = DapolTree::parse_public_root_data_serialization_path(path.clone())?;
         read_write_utils::serialize_to_json_file(&public_root_data, path.clone())?;
 
         Ok(path)
@@ -572,12 +572,12 @@ impl DapolTree {
     /// let dapol_config = DapolConfig::deserialize(config_file_path).unwrap();
     /// let dapol_tree = dapol_config.parse().unwrap();
     ///
-    /// let secret_root_path = examples_dir.join("root_secret_data.json");
+    /// let secret_root_path = examples_dir.join("secret_root_data.json");
     /// let _ = dapol_tree.serialize_secret_root_data(secret_root_path).unwrap();
     /// ```
     pub fn serialize_secret_root_data(&self, dir: PathBuf) -> Result<PathBuf, DapolTreeError> {
-        let secret_root_data: RootSecretData = self.root_secret_data();
-        let path = DapolTree::parse_root_secret_data_serialization_path(dir.clone())?;
+        let secret_root_data: RootSecretData = self.secret_root_data();
+        let path = DapolTree::parse_secret_root_data_serialization_path(dir.clone())?;
         read_write_utils::serialize_to_json_file(&secret_root_data, path.clone())?;
 
         Ok(path)
@@ -634,17 +634,17 @@ impl DapolTree {
     ///
     /// let src_dir = env!("CARGO_MANIFEST_DIR");
     /// let examples_dir = Path::new(&src_dir).join("examples");
-    /// let public_root_path = examples_dir.join("root_public_data.json");
+    /// let public_root_path = examples_dir.join("public_root_data.json");
     ///
     /// let public_root_data = DapolTree::deserialize_public_root_data(public_root_path).unwrap();
     /// ```
     pub fn deserialize_public_root_data(path: PathBuf) -> Result<RootPublicData, DapolTreeError> {
         read_write_utils::check_deserialization_path(&path, "json")?;
 
-        let root_public_data: RootPublicData =
+        let public_root_data: RootPublicData =
             read_write_utils::deserialize_from_json_file(path.clone()).log_on_err()?;
 
-        Ok(root_public_data)
+        Ok(public_root_data)
     }
 
     /// Deserialize the secret root data from the given file path.
@@ -663,17 +663,17 @@ impl DapolTree {
     ///
     /// let src_dir = env!("CARGO_MANIFEST_DIR");
     /// let examples_dir = Path::new(&src_dir).join("examples");
-    /// let secret_root_path = examples_dir.join("root_secret_data.json");
+    /// let secret_root_path = examples_dir.join("secret_root_data.json");
     ///
     /// let secret_root_data = DapolTree::deserialize_secret_root_data(secret_root_path).unwrap();
     /// ```
     pub fn deserialize_secret_root_data(path: PathBuf) -> Result<RootSecretData, DapolTreeError> {
         read_write_utils::check_deserialization_path(&path, "json")?;
 
-        let root_secret_data: RootSecretData =
+        let secret_root_data: RootSecretData =
             read_write_utils::deserialize_from_json_file(path.clone()).log_on_err()?;
 
-        Ok(root_secret_data)
+        Ok(secret_root_data)
     }
 }
 
