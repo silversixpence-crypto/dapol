@@ -3,11 +3,11 @@
 // -------------------------------------------------------------------------------------------------
 // Test utils for sub-modules.
 
-#[cfg(any(test, fuzzing))]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod test_utils {
     use super::super::*;
-    use primitive_types::H256;
     use crate::hasher::Hasher;
+    use primitive_types::H256;
 
     #[derive(Clone, Debug, PartialEq, Serialize)]
     pub struct TestContent {
@@ -46,7 +46,11 @@ pub mod test_utils {
         }
     }
 
-    pub fn random_leaf_nodes(num_leaf_nodes: u64, height: &Height, seed: u64) -> Vec<InputLeafNode<TestContent>> {
+    pub fn random_leaf_nodes(
+        num_leaf_nodes: u64,
+        height: &Height,
+        seed: u64,
+    ) -> Vec<InputLeafNode<TestContent>> {
         use crate::accumulators::RandomXCoordGenerator;
 
         let mut leaf_nodes = Vec::<InputLeafNode<TestContent>>::new();

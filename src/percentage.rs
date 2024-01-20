@@ -17,7 +17,8 @@ impl Percentage {
     /// Returns a new `Percentage` with the given value.
     /// Panics if the value is greater than 100.
     ///
-    /// Note that if we try to implement the From trait then we have a collision.
+    /// Note that if we try to implement the From trait then we have a
+    /// collision.
     pub fn expect_from(value: u8) -> Percentage {
         match Percentage::try_from(value) {
             Err(e) => panic!("{}", e),

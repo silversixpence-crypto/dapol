@@ -600,7 +600,7 @@ fn max_nodes_to_store(num_leaf_nodes: u64, height: &Height) -> u64 {
 // TODO recursive function err - NOT x-coord max multiple of 2
 // TODO recursive function err - max - min must be power of 2
 
-#[cfg(any(test, fuzzing))]
+#[cfg(any(test, feature = "fuzzing"))]
 pub(crate) mod tests {
     use std::str::FromStr;
 
@@ -671,7 +671,8 @@ pub(crate) mod tests {
         assert_err!(
             res,
             Err(TreeBuildError::TooManyLeaves {
-                // TODO does assert_err work for these values? If we change the values does the test pass?
+                // TODO does assert_err work for these values? If we change the values does the test
+                // pass?
                 given: leaf_nodes,
                 max: max_nodes,
             })

@@ -91,7 +91,8 @@ pub enum Command {
 
     /// Verify an inclusion proof.
     ///
-    /// Note: the root hash of the tree is logged out on tree creation (an info-level log).
+    /// Note: the root hash of the tree is logged out on tree creation (an
+    /// info-level log).
     VerifyInclusionProof {
         /// File path for the serialized inclusion proof file.
         #[arg(short, long)]

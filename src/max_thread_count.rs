@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 pub const DEFAULT_MAX_THREAD_COUNT: u8 = 4;
 
 /// Abstraction for the max number of threads.
-///
 #[doc = include_str!("./shared_docs/max_thread_count.md")]
 ///
 /// Example:

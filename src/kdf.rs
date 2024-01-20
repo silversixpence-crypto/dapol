@@ -5,8 +5,8 @@
 //! The HKDF is split into 2 separate functions: extract & expand (both of which
 //! utilize HMAC).
 //!
-//! `HKDF(salt, IKM, info, length) = HKDF-Expand(HKDF-Extract(salt, IKM), info, length)`
-//! where `HKDF-Extract(salt, IKM) = HMAC(key=salt, message=IKM)`
+//! `HKDF(salt, IKM, info, length) = HKDF-Expand(HKDF-Extract(salt, IKM), info,
+//! length)` where `HKDF-Extract(salt, IKM) = HMAC(key=salt, message=IKM)`
 //!
 //! For more information check out these resources:
 //! - [Cryptographic Extraction and Key Derivation: The HKDF Scheme](https://eprint.iacr.org/2010/264.pdf)

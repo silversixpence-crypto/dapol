@@ -76,7 +76,7 @@ pub enum AccumulatorType {
 impl fmt::Display for AccumulatorType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AccumulatorType::NdmSmt => write!(f, "NDM-SMT")
+            AccumulatorType::NdmSmt => write!(f, "NDM-SMT"),
         }
     }
 }

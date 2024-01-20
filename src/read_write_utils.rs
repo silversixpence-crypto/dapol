@@ -176,7 +176,9 @@ pub fn check_deserialization_path(
                 })
             }
         }
-        None => Err(ReadWriteError::NoFileExtension(path.clone().into_os_string())),
+        None => Err(ReadWriteError::NoFileExtension(
+            path.clone().into_os_string(),
+        )),
     }
 }
 
