@@ -289,7 +289,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
             let src_dir = env!("CARGO_MANIFEST_DIR");
             let target_dir = Path::new(&src_dir).join("target");
             let dir = target_dir.join("serialized_proofs");
-            std::fs::create_dir_all(dir)?;
+            std::fs::create_dir_all(dir.clone()).unwrap();
             let path = proof
                 .expect("Proof should be set")
                 .serialize(entity_id, dir)
@@ -387,7 +387,7 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
                     format!("height_{}/num_entities_{}", h.as_u32(), n),
                 ),
                 |bench| {
-                    bench.iter(|| proof.verify(root_hash));
+                    bench.iter(|| proof.verify(*root_hash));
                 },
             );
         }
