@@ -56,12 +56,15 @@ As with PD there is an SD tuple for each tree: $SD = (M, \epsilon)$ where $M$ is
 
 #### Master secret $M$
 
-$M$ must be seen only by $\mathcal{P}$ because exposing this value would mean an attacker could guess an entity's ID from the leaf node hash (assuming the ID has low entropy) using the below steps. Once an attacker has the ID they can guess the entity's liability from the leaf node's commitment value.
+$M$ must be seen only by $\mathcal{P}$ because exposing this value would mean an attacker could guess an entity's ID from the leaf node hash (assuming the ID has low entropy) using the below steps. Once an attacker has the ID they can guess the entity's liability from the leaf node's commitment value (assuming the liability has low entropy).
 1. An adversary ($\mathcal{A}$) gains access to a leaf node's data (hash & Pedersen commitment)
 2. $\mathcal{A}$ guesses $\text{id}_u$ and calculates $w_u = \text{KDF}(M, \text{id}_u)$
 3. $\mathcal{A}$ calculates $s_u = \text{KDF}(w_u, S_{\text{hash}})$
 4. $\mathcal{A}$ calculates $h_u = \text{hash}(\text{"leaf"} | \text{id}_u | s_u)$
 5. If $h_u$ is equal to the hash of the leaf node then $\mathcal{A}$ has guessed $\text{id}_u$ correctly, otherwise go back to #1
+6. $\mathcal{A}$ uses $\text{id}_u$ to calculate $w_u$, and then $b_u = \text{KDF}(w_u, S_{\text{com}})$
+7. $\mathcal{A}$ guesses $l_u$ and calculates $c_u=g^{l_u}_1 g^{b_u}_2$
+8. If $c_u$ is equal to the commitment of the leaf node then $\mathcal{A}$ has guessed $l_u$ correctly, otherwise go back to the previous step
 
 The paper advises to keep $M$ the same across PoLs so that entities only need to request their verification key $w_u = \text{KDF}(M, \text{id}_u)$ from the exchange once, and then reuse it to do verification on all PoLs. Having the same master secret does not pose a security risk for $\mathcal{P}$ because it is only used to generate the verification keys for the entity, and it is passed through a key derivation function for this so that simply having the verification key does not allow one to guess the master secret in reasonable time. In order for this security to hold, however, it is important to have a master secret with high entropy ($>256$ bits).
 
@@ -79,13 +82,13 @@ The security & privacy proofs in the paper assume the tree is held by $\mathcal{
 
 Functions from the paper and their equivalents in the code:
 
-| Function in paper | Description                                            | Equivalents in code                                                                                                                                  |
-|:------------------|:-------------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------|
-| Setup             | Produces the PD & SD tuples                            | `DapolTree::public_root_data`<br>`DapolTree::root_hash`<br>`DapolTree::root_commitment`<br>`DapolTree::master_secret`<br>`DapolTree::entity_mapping` |
-| ProveTot          | Reveals the blinding factor and the liability sum      | `DapolTree::secret_root_data`<br>`DapolTree::root_liability`<br>`DapolTree::root_blinding_factor`                                                    |
-| VerifyTot         | Checks that Public Data corresponds to the Secret Data | `DapolTree::verify_root_commitment`                                                                                                                  |
-| Prove             | Inclusion proof generation for an entity               | `DapolTree::generate_inclusion_proof`                                                                                                                |
-| Verify            | Verify inclusion proof                                 |  `InclusionProof::verify`                                                                                                                                                    |
+| Function in paper | Description                                            | Equivalents in code                                                                                                                                                                                                              |
+|:------------------|:-------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Setup             | Produces the PD & SD tuples                            | `DapolTree::new(...) -> DapolTree`<br>`DapolTree::public_root_data(DapolTree) -> (Hash, RistrettoPoint)`<br>`DapolTree::master_secret(DapolTree) -> Secret`<br>`DapolTree::entity_mapping(DapolTree) -> HashMap<EntityId, u64>>` |
+| ProveTot          | Reveals the blinding factor and the liability sum      | `DapolTree::secret_root_data(DapolTree) -> (u64, curve25519::Scalar)`                                                                                                                                                            |
+| VerifyTot         | Checks that Public Data corresponds to the Secret Data | `DapolTree::verify_root_commitment`                                                                                                                                                                                              |
+| Prove             | Inclusion proof generation for an entity               | `DapolTree::generate_inclusion_proof`                                                                                                                                                                                            |
+| Verify            | Verify inclusion proof                                 | `InclusionProof::verify`                                                                                                                                                                                                         |
 
 
 ## Dependencies
