@@ -62,7 +62,7 @@ $M$ must be seen only by $\mathcal{P}$ because exposing this value would mean an
 3. $\mathcal{A}$ calculates $s_u = \text{KDF}(w_u, S_{\text{hash}})$
 4. $\mathcal{A}$ calculates $h_u = \text{hash}(\text{"leaf"} | \text{id}_u | s_u)$
 5. If $h_u$ is equal to the hash of the leaf node then $\mathcal{A}$ has guessed $\text{id}_u$ correctly, otherwise go back to #1
-6. $\mathcal{A}$ uses $\text{id}_u$ to calculate $w_u$, and then $b_u = \text{KDF}(w_u, S_{\text{com}})$
+6. $\mathcal{A}$ uses the ID to calculate $w_u$, and then $b_u = \text{KDF}(w_u, S_{\text{com}})$
 7. $\mathcal{A}$ guesses $l_u$ and calculates $c_u=g^{l_u}_1 g^{b_u}_2$
 8. If $c_u$ is equal to the commitment of the leaf node then $\mathcal{A}$ has guessed $l_u$ correctly, otherwise go back to the previous step
 
