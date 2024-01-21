@@ -35,6 +35,7 @@ The following values are set automatically by the codebase:
 
 These values can be set by $\mathcal{P}$:
 - $\text{MaxL}$ (default is $2^{32}$)
+- $H$ (default is $32$)
 - Both the salts (default to being randomly generated using a CSPRNG)
 
 #### Note on the salts
@@ -97,7 +98,7 @@ The KDF protocol used is [HKDF-SHA256](https://datatracker.ietf.org/doc/html/rfc
 
 [blake3](https://docs.rs/blake3/latest/blake3/) is used as the hash function to construct the Merkle tree.
 
-[`thread_rng` from rand](https://docs.rs/rand/latest/rand/rngs/struct.ThreadRng.html) is used as the CSPRNG for the shuffle algorithm for the NDM-SMT.
+[`thread_rng` from rand](https://docs.rs/rand/latest/rand/rngs/struct.ThreadRng.html) is used as the CSPRNG for the shuffle algorithm for the NDM-SMT as well as generating random salts if $\mathcal{P}$ does not provide them.
 
 ### Bulletproofs
 
@@ -133,21 +134,34 @@ panic if there is a bug in the code. if the input is incorrect then return an er
 
 ### Limits & types
 
-For the tree height:
-- max height: 64 (64 was chosen as the max height because with the NDM-SMT we can have $2^36$ ($~70\text{B}$) entities and still have only $10^-9$ of the bottom layer spaces filled. With DM SMT we may need to increase this max.)
-- min height: 2
-- type: u8 (2^8 = 256 is more than big enough as the maximum possible height)
+For the tree height $H$:
+- Max value: $64$. This was chosen as the max because with the NDM-SMT we can have $2^{36}$ ($~70\text{B}$) entities and still have only $10^{-9}%%$ of the bottom layer spaces filled. With DM SMT we may need to increase this value, which can be easily done.
+- Min value: $2$
+- Type: `u8` (2^8 = 256 is more than big enough as the maximum possible height)
+- Default: $32$
 
-TODO more
+For the max liability $\text{MaxL}$:
+- Max value: $2^{64}$. This value was chosen because $64$-bit numbers are the largest natively supported by Rust. This value can be increased if need be.
+- Type: `u64`
+- Default: $2^{32}$
 
-### Naming & orientation
+Master secret $M$:
+- Type: `u8` array of length $32$, giving a total of $256$ bits.
+- No default supported. This is to ensure that security is determined by $\mathcal{P}$ explicitly.
 
-TODO
+The salts $S_{\text{hash}}$ & $S_{\text{com}}$:
+- Type: `u8` array of length $32$, giving a total of $256$ bits.
+- Default: random value chosen uniformly using `thread_rng`.
 
-paper uses term idx but code uses coordinate
+### Tree coordinates
 
-y-coord is 0 where the bottom leaves are and height-1 where the root node is
-x-coord is 0 at the left of the tree (imagine the tree squashed to the left making it seem slanted on the right)
+The paper uses term "idx" but code uses a Cartesian plane coordinate system. Picture a full binary tree with it's bottom layer nodes on the x-axis, the left-most node occupying the origin at coordinate $(0,0)$. The typical image of a binary tree has each of the parent nodes situated vertically above its children, and horizontally halfway between them. The tree in the Cartesian plane is slightly different: each parent node sits vertically 1 unit above its children nodes (similar to the typical image), but horizontally it is situated at the x-coord that is half of its left child's x-coord. This has the visual effect of making the tree look squashed up against the y-axis. We have the following specific coordinates for more information:
+- The y-coord for all bottom layer nodes is $0$
+- The x-coord for the left-most node on the bottom layer of the tree is $0$
+- The x-coord for the right-most node on the bottom layer of the tree is $2^H-1$
+- The y-coord for the root node is $H-1$
+- The x-coord for the root node is $0$
+For trees that are not **full** (i.e. only **complete**) there will be gaps along the horizontal lines where there are no nodes i.e. for each y-coord in the integer range $y_0 \in [0,H-1]$ there will be at least 1 node with coord $(x,y_0)$, but, for some $y_0 \in [0,H-1]$, not every x-coord in the integer range $x_0 \in [0,2^{y_0}]$ will yield a node with coord $(x_0,y_0)$.
 
 ### Knobs $\mathcal{P}$ can use to adjust efficiency trade-offs
 
