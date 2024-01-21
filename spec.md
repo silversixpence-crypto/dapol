@@ -44,7 +44,7 @@ Both the salts should be changed for each PoL generated. If this is not done the
 2. If an entity's balance has changed from 1st to 2nd PoL then an attacker can guess the balance by dividing the commitments. Since the entity's balance is not an input to the hash function the attacker can first perform the above attack to locate leaf nodes that match to the same user, then do the division. The division attack goes like this:
     1. Entity's 2 leaf node commitments are $c_u=g^{l_u}_1 g^{b_u}_2$ & $c'_u=g^{l'_u}_1 g^{b_u}_2$
     2. Attacker divides the 2 to get $c=g^{l_u-l'_u}_1$
-    3. The liabilities generally have less than 64-bit security so the attacker can brute-force guess the value of $l_u-l'_u$, which gives the attacker insight into the trading actions taken by the entity
+    3. The liabilities generally have less than 64 bits of entropy so the attacker can guess the value of $l_u-l'_u$, which gives the attacker insight into the trading actions taken by the entity
 
 ### Public data (PD)
 
@@ -56,11 +56,11 @@ As with PD there is an SD tuple for each tree: $SD = (M, \epsilon)$ where $M$ is
 
 #### Master secret $M$
 
-$M$ must be kept seen only by $\mathcal{P}$ because exposing this would mean $\text{id}_u$'s & $l_i$'s could be guessed by brute-force method (if the ID space used is small enough and IDs have low entropy):
+$M$ must be seen only by $\mathcal{P}$ because exposing this value would mean an attacker could guess an entity's ID from the leaf node hash (assuming the ID has low entropy) using the below steps. Once an attacker has the ID they can guess the entity's liability from the leaf node's commitment value.
 1. An adversary ($\mathcal{A}$) gains access to a leaf node's data (hash & Pedersen commitment)
 2. $\mathcal{A}$ guesses $\text{id}_u$ and calculates $w_u = \text{KDF}(M, \text{id}_u)$
 3. $\mathcal{A}$ calculates $s_u = \text{KDF}(w_u, S_{\text{hash}})$
-4. $\mathcal{A}$ calculates $h_u = \text{hash}(\text{"leaf"} | \text{id}_u | s_u)
+4. $\mathcal{A}$ calculates $h_u = \text{hash}(\text{"leaf"} | \text{id}_u | s_u)$
 5. If $h_u$ is equal to the hash of the leaf node then $\mathcal{A}$ has guessed $\text{id}_u$ correctly, otherwise go back to #1
 
 The paper advises to keep $M$ the same across PoLs so that entities only need to request their verification key $w_u = \text{KDF}(M, \text{id}_u)$ from the exchange once, and then reuse it to do verification on all PoLs. Having the same master secret does not pose a security risk for $\mathcal{P}$ because it is only used to generate the verification keys for the entity, and it is passed through a key derivation function for this so that simply having the verification key does not allow one to guess the master secret in reasonable time. In order for this security to hold, however, it is important to have a master secret with high entropy ($>256$ bits).
