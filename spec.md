@@ -29,14 +29,15 @@ where
 The following values are set automatically by the codebase:
 - $\mathbb{G}$ is the Ristretto Group for Curve25519 with the following generator elements
   - $g_1=$ [ED25519_BASEPOINT](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/backend/serial/u64/constants.rs#L129)
-  - $g_2=\text{pointFromHash}(\text{hash}(g_1))$ (SHA3 is used as the hash function, and the Elligator map is used to turn the digest into an elliptic curve point, see [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/ristretto.rs#L688) for more details)
+  - $g_2=\text{pointFromHash}(\text{hash}(g_1))$ (SHA3 is used as the hash function, and the Elligator map is used to turn the digest into an elliptic curve point, see [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/ristretto.rs#L688) for more details, also [Ristretto group section](#Ristretto))
 - $\mathcal{R}$ is the Bulletproofs protocol
 - $N=2^H$ because this sets the highest possible upper bound
-- $\text{MaxL}=2^{B-H}$ so that the upper bound is $2^B$ where $B$ is set by $\mathcal{P}$ (the Bulletproofs library requires a power of 2 as the upper bound, and requires that power to be one of $[8, 16, 32, 64]$)
 
-These values can be set by $\mathcal{P}$
-- $B$ which is the bit length of the range proof upper bound (must be one of $[8, 16, 32, 64]$ to work for Bulletproofs, defaults to 64)
-- Both the salts (randomly generated using a CSPRNG if not set)
+These values can be set by $\mathcal{P}$:
+- $\text{MaxL}$ (default is $2^{32}$)
+- Both the salts (default to being randomly generated using a CSPRNG)
+
+#### Note on the salts
 
 Both the salts should be changed for each PoL generated. If this is not done then blinding factors & hashes for leaf nodes do not change across PoLs, so there are 2 possible ways of gaining some information:
 1. An attacker can detect which leaf node belongs to the same entity across 2 PoLs by matching up leaf node hashes. Of course they would need access to the leaf nodes of tree to be able to do this, so the attack can be minimized by sharing parts of the tree only with registered entities.
@@ -51,7 +52,7 @@ Each tree in DAPOL+ has a PD tuple which needs to be posted on a PBB for the PoL
 
 ### Secret data (SD)
 
-As with PD there is an SD tuple for each tree: $SD = (M, \epsilon)$. Where $M$ is the master secret and $\epsilon$ is a map from entity to leaf node (only required for the NDM SMT).
+As with PD there is an SD tuple for each tree: $SD = (M, \epsilon)$ where $M$ is the master secret and $\epsilon$ is a map from entity to leaf node.
 
 #### Master secret $M$
 
@@ -62,11 +63,11 @@ $M$ must be kept seen only by $\mathcal{P}$ because exposing this would mean $\t
 4. $\mathcal{A}$ calculates $h_u = \text{hash}(\text{"leaf"} | \text{id}_u | s_u)
 5. If $h_u$ is equal to the hash of the leaf node then $\mathcal{A}$ has guessed $\text{id}_u$ correctly, otherwise go back to #1
 
-The paper advises to keep $M$ the same across PoLs so that entities only need to request their verification key $w_u = \text{KDF}(M, \text{id}_u)$ from the exchange once, and then reuse it to do verification on all PoLs. Having the same master secret does not pose a security risk for $\mathcal{P}$ because it is only used to generate the verification keys for the entity, and it is passed through a key derivation function for this.
+The paper advises to keep $M$ the same across PoLs so that entities only need to request their verification key $w_u = \text{KDF}(M, \text{id}_u)$ from the exchange once, and then reuse it to do verification on all PoLs. Having the same master secret does not pose a security risk for $\mathcal{P}$ because it is only used to generate the verification keys for the entity, and it is passed through a key derivation function for this so that simply having the verification key does not allow one to guess the master secret in reasonable time. In order for this security to hold, however, it is important to have a master secret with high entropy ($>256$ bits).
 
 #### Entity mapping $\epsilon$
 
-The user mapping (if using an NDM SMT) must be known only by $\mathcal{P}$ because exposing this will leak user IDs and where they are mapped to on the tree.
+The user mapping must be known only by $\mathcal{P}$ because exposing this will leak user IDs and where they are mapped to on the tree. The entity map is not required for the DM-SMT accumulator variant since the mapping is deterministically generated from the master secret.
 
 In the code $\epsilon$ is a hashmap from entity ID to x-coordinate on the bottom layer of the tree.
 
@@ -93,7 +94,7 @@ The KDF protocol used is [HKDF-SHA256](https://datatracker.ietf.org/doc/html/rfc
 
 [blake3](https://docs.rs/blake3/latest/blake3/) is used as the hash function to construct the Merkle tree.
 
-[`thread_rng` from rand](https://docs.rs/rand/latest/rand/rngs/struct.ThreadRng.html) is used as the CSPRNG for the shuffle algorithm for the NDM SMT.
+[`thread_rng` from rand](https://docs.rs/rand/latest/rand/rngs/struct.ThreadRng.html) is used as the CSPRNG for the shuffle algorithm for the NDM-SMT.
 
 ### Bulletproofs
 
@@ -130,7 +131,7 @@ panic if there is a bug in the code. if the input is incorrect then return an er
 ### Limits & types
 
 For the tree height:
-- max height: 64 (64 was chosen as the max height because with the NDM SMT we can have $2^36$ ($~70\text{B}$) entities and still have only $10^-9$ of the bottom layer spaces filled. With DM SMT we may need to increase this max.)
+- max height: 64 (64 was chosen as the max height because with the NDM-SMT we can have $2^36$ ($~70\text{B}$) entities and still have only $10^-9$ of the bottom layer spaces filled. With DM SMT we may need to increase this max.)
 - min height: 2
 - type: u8 (2^8 = 256 is more than big enough as the maximum possible height)
 
