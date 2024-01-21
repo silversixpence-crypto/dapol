@@ -11,48 +11,6 @@ The implementation is written in Rust due to a) the readily available libraries 
 
 ## PoL data, functions & parameters
 
-### Functions
-
-Functions from paper and their equivalents in the code:
-
-#### Setup
-
-**Output**: produces the Public Data (root hash, root commitment) & Secret Data (master secret, leaf node mapping** tuples
-
-**Code equivalents**:
-- `DapolTree::public_root_data`, which is made up of these 2:
-  - `DapolTree::root_hash`
-  - `DapolTree::root_commitment`
-- `DapolTree::master_secret`
-- `DapolTree::entity_mapping`
-
-#### ProveTot
-
-**Output**: reveals the blinding factor and the liability sum
-
-**Code equivalents**:
-- `DapolTree::secret_root_data`, which is made up of these 2:
-  - `DapolTree::root_liability`
-  - `DapolTree::root_blinding_factor**
-
-#### VerifyTot
-
-**Output**: checks that Public Data corresponds to the Secret Data
-
-**Code equivalent**: `DapolTree::verify_root_commitment`
-
-#### Prove
-
-**Output**: inclusion proof generation for an entity
-
-**Code equivalent**: `DapolTree::generate_inclusion_proof`
-
-#### Verify
-
-**Output**: verify inclusion proof
-
-**Code equivalent**: `InclusionProof::verify`
-
 ### Public parameters
 
 DAPOL+ requires the following public parameters to be set before generating any trees:
@@ -69,16 +27,23 @@ where
 - $\mathcal{R}$ is the range proof protocol
 
 The following values are set automatically by the codebase:
-- $\mathbb{G}$ is the Ristretto group, TODO what are the generators?
+- $\mathbb{G}$ is the Ristretto Group for Curve25519 with the following generator elements
+  - $g=$ [ED25519_BASEPOINT](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/backend/serial/u64/constants.rs#L129)
+  - $h=\text{pointFromHash}(\text{hash}(g))$ (SHA3 is used as the hash function, and the Elligator map is used to turn the digest into an elliptic curve point, see [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/ristretto.rs#L688) for more details)
 - $\mathcal{R}$ is the Bulletproofs protocol
-- $N=2^H$ because why would anyone want to publicly lower the upper bound?
-- $\text{MaxL}=2^{B-H}$ so that the upper bound is $2^B$ where $B$ is set by $\mathcal{P}$ (the Bulletproofs library requires a power of 2 as the upper bound)
+- $N=2^H$ because this sets the highest possible upper bound
+- $\text{MaxL}=2^{B-H}$ so that the upper bound is $2^B$ where $B$ is set by $\mathcal{P}$ (the Bulletproofs library requires a power of 2 as the upper bound, and requires that power to be one of $[8, 16, 32, 64]$)
 
 These values can be set by $\mathcal{P}$
-- $B$ which is the bit length of the range proof upper bound (defaults to 64)
-- Both the salts (randomly generated if not set)
+- $B$ which is the bit length of the range proof upper bound (must be one of $[8, 16, 32, 64]$, defaults to 64)
+- Both the salts (randomly generated using a CSPRNG if not set)
 
-Both the salts should be changed for each PoL generated TODO say why (involves brute force attacks and master secret)
+Both the salts should be changed for each PoL generated. If this is not done then blinding factors & hashes for leaf nodes do not change across PoLs, so there are 2 possible ways of gaining some information:
+1. An attacker can detect which leaf node belongs to the same entity across 2 PoLs by matching up leaf node hashes. Of course they would need access to the leaf nodes of tree to be able to do this, so the attack can be minimized by sharing parts of the tree only with registered entities.
+2. If an entity's balance has changed from 1st to 2nd PoL then an attacker can guess the balance by dividing the commitments. Since the entity's balance is not an input to the hash function the attacker can first perform the above attack to locate leaf nodes that match to the same user, then do the division. The division attack goes like this:
+  a. Entity's 2 leaf node commitments are $c_u=g^{l_u}_1 g^{b_u}_2$ & $c'_u=g^{l'_u}_1 g^{b_u}_2$
+  b. Attacker divides the 2 to get $c=g^{l_u-l'_u}_1$
+  c. The liabilities generally have less than 64-bit security so the attacker can brute-force guess the value of $l_u-l'_u$, which gives the attacker insight into the trading actions taken by the entity
 
 ### Public data (PD)
 
@@ -87,8 +52,6 @@ Each tree in DAPOL+ has a PD tuple which needs to be posted on a PBB for the PoL
 $$PD = (C_{\text{root}}, H_{\text{root}})$$PD
 
 The hash & Pedersen commitment of the root node.
-
-This data is available in the API via TODO
 
 ### Secret data (SD)
 
@@ -107,9 +70,7 @@ $M$ must be kept seen only by $\mathcal{P}$ because exposing this would mean $\t
 3. $athcal{A}$ calculates $h_u = \text{hash}(\text{"leaf"} | \text{id}_u | s_u)
 4. If $h_u$ is equal to the hash of the leaf node then $\mathcal{A}$ has guessed $\text{id}_u$ correctly, otherwise go back to #1
 
-TODO what if you have multiple $w_u$'s and id_u's? can you try find the master secret?
-
-The paper advises to keep $M$ the same across PoLs so that users only need to request $w_u = \text{KDF}(M, \text{id}_u)$ from the exchange once. TODO say more TODO say why having the same master secret is not a security concern
+The paper advises to keep $M$ the same across PoLs so that entities only need to request their verification key $w_u = \text{KDF}(M, \text{id}_u)$ from the exchange once, and then reuse it to do verification on all PoLs. Having the same master secret does not pose a security risk for $\mathcal{P}$ because it is only used to generate the verification keys for the entity, and it is passed through a key derivation function for this.
 
 #### $\epsilon$
 
@@ -120,6 +81,49 @@ In the code $\epsilon$ is a hashmap from entity ID to x-coordinate on the bottom
 ### Tree
 
 The security & privacy proofs in the paper assume the tree is held by $\mathcal{P}$ and so it is recommended that the tree be kept secret and inclusion proofs only given out to authenticated entities.
+
+### Functions
+
+Functions from the paper and their equivalents in the code:
+
+#### Setup
+
+Produces the Public Data (root hash, root commitment) & Secret Data (master secret, leaf node mapping) tuples.
+
+Code equivalents:
+- `DapolTree::public_root_data`, which is made up of these 2:
+  - `DapolTree::root_hash`
+  - `DapolTree::root_commitment`
+- `DapolTree::master_secret`
+- `DapolTree::entity_mapping`
+
+#### ProveTot
+
+Reveals the blinding factor and the liability sum.
+
+Code equivalents:
+- `DapolTree::secret_root_data`, which is made up of these 2:
+  - `DapolTree::root_liability`
+  - `DapolTree::root_blinding_factor**
+
+#### VerifyTot
+
+Checks that Public Data corresponds to the Secret Data.
+
+Code equivalent: `DapolTree::verify_root_commitment`
+
+#### Prove
+
+Inclusion proof generation for an entity.
+
+Code equivalent: `DapolTree::generate_inclusion_proof`
+
+#### Verify
+
+Verify inclusion proof.
+
+Code equivalent: `InclusionProof::verify`
+
 
 ## Dependencies
 
