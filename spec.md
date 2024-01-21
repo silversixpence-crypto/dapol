@@ -15,10 +15,10 @@ The implementation is written in Rust due to a) the readily available libraries 
 
 DAPOL+ requires the following public parameters to be set before generating any trees:
 
-$$\left( ( \mathbb{G}, g, h ), \mathcal{R}, N, \text{MaxL}, H, S_{\text{com}}, S_{\text{hash}} \right)$$
+$$\left( ( \mathbb{G}, g_1, g_2 ), \mathcal{R}, N, \text{MaxL}, H, S_{\text{com}}, S_{\text{hash}} \right)$$
 
 where
-- $\mathbb{G}$ is a group of prime order, with generators $g$ & $h$ s.t. their relative logarithm is unknown
+- $\mathbb{G}$ is a group of prime order, with generators $g_1$ & $g_2$ s.t. their relative logarithm is unknown
 - $N$ is the upper bound on the number of entities i.e. if $n$ is the number of entities to be modeled by the tree, then $n < N$ (note that we must have $N \le 2^H$ since that is the maximum number of bottom layer leaf node for entities)
 - $\text{MaxL}$ is the maximum liability of any single entity, and is used to determine the upper bound for the range proof: $N \text{MaxL}$
 - $H$ is the height of the tree
@@ -28,8 +28,8 @@ where
 
 The following values are set automatically by the codebase:
 - $\mathbb{G}$ is the Ristretto Group for Curve25519 with the following generator elements
-  - $g=$ [ED25519_BASEPOINT](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/backend/serial/u64/constants.rs#L129)
-  - $h=\text{pointFromHash}(\text{hash}(g))$ (SHA3 is used as the hash function, and the Elligator map is used to turn the digest into an elliptic curve point, see [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/ristretto.rs#L688) for more details)
+  - $g_1=$ [ED25519_BASEPOINT](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/backend/serial/u64/constants.rs#L129)
+  - $g_2=\text{pointFromHash}(\text{hash}(g_1))$ (SHA3 is used as the hash function, and the Elligator map is used to turn the digest into an elliptic curve point, see [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/ristretto.rs#L688) for more details)
 - $\mathcal{R}$ is the Bulletproofs protocol
 - $N=2^H$ because this sets the highest possible upper bound
 - $\text{MaxL}=2^{B-H}$ so that the upper bound is $2^B$ where $B$ is set by $\mathcal{P}$ (the Bulletproofs library requires a power of 2 as the upper bound, and requires that power to be one of $[8, 16, 32, 64]$)
@@ -57,9 +57,9 @@ As with PD there is an SD tuple for each tree: $SD = (M, \epsilon)$. Where $M$ i
 
 $M$ must be kept seen only by $\mathcal{P}$ because exposing this would mean $\text{id}_u$'s & $l_i$'s could be guessed by brute-force method (if the ID space used is small enough and IDs have low entropy):
 1. An adversary ($\mathcal{A}$) gains access to a leaf node's data (hash & Pedersen commitment)
-2. $mathcal{A}$ guesses $\text{id}_u$ and calculates $w_u = \text{KDF}(M, \text{id}_u)$
-3. $mathcal{A}$ calculates $s_u = \text{KDF}(w_u, S_{\text{hash}})$
-4. $mathcal{A}$ calculates $h_u = \text{hash}(\text{"leaf"} | \text{id}_u | s_u)
+2. $\mathcal{A}$ guesses $\text{id}_u$ and calculates $w_u = \text{KDF}(M, \text{id}_u)$
+3. $\mathcal{A}$ calculates $s_u = \text{KDF}(w_u, S_{\text{hash}})$
+4. $\mathcal{A}$ calculates $h_u = \text{hash}(\text{"leaf"} | \text{id}_u | s_u)
 5. If $h_u$ is equal to the hash of the leaf node then $\mathcal{A}$ has guessed $\text{id}_u$ correctly, otherwise go back to #1
 
 The paper advises to keep $M$ the same across PoLs so that entities only need to request their verification key $w_u = \text{KDF}(M, \text{id}_u)$ from the exchange once, and then reuse it to do verification on all PoLs. Having the same master secret does not pose a security risk for $\mathcal{P}$ because it is only used to generate the verification keys for the entity, and it is passed through a key derivation function for this.
@@ -107,11 +107,11 @@ The Bulletproofs code is also used for calculating Pedersen commitments, and the
 
 ### Ristretto
 
-The [Ristretto Group](https://ristretto.group) for Curve25519 as the elliptic curve group for the Pedersen commitments. [curve25519-dalek-ng](https://github.com/zkcrypto/curve25519-dalek-ng) is the rust implementation used, which is a fork of [curve25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek/) (see [this gh issue](https://github.com/zkcrypto/bulletproofs/issues/15) for details on the fork).
+The [Ristretto Group](https://ristretto.group) for Curve25519 is used as the elliptic curve group for the Pedersen commitments. [curve25519-dalek-ng](https://github.com/zkcrypto/curve25519-dalek-ng) is the rust implementation used, which is a fork of [curve25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek/) (see [this gh issue](https://github.com/zkcrypto/bulletproofs/issues/15) for details on the fork).
 
 The paper requires 2 generators of $G$, $g_1$ & $g_2$, such that their relative discrete logarithm is unknown.
 
-$g_1$ is set to the point defined [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/763a0faaf54752b06702b39e2296173ab76c2204/src/backend/serial/u64/constants.rs#L129), which is exactly the same as the point used in the Bulletproofs implementation. The point is said to be the 'Ed25519 basepoint' but it is not clear if the point is equal to the one defined in [the RFC for Ed25519](https://datatracker.ietf.org/doc/html/rfc8032) or the base point for Curve25519 given by [SafeCurves](https://safecurves.cr.yp.to/base.html). The differences may be due to different encoding methods (dalek encoding of field elements is explained [here](https://doc-internal.dalek.rs/curve25519_dalek/backend/serial/u64/field/struct.FieldElement51.html)). The order of the base point [is said to be](https://github.com/zkcrypto/curve25519-dalek-ng/blob/763a0faaf54752b06702b39e2296173ab76c2204/src/backend/serial/u64/constants.rs#L95) the prime $2^252 + 27742317777372353535851937790883648493$, which is the same as the order of the other 2 base points in the literature, and will produce a subgroup of co-factor 8 (which is what we what, essentially).
+$g_1$ is set to the point defined [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/763a0faaf54752b06702b39e2296173ab76c2204/src/backend/serial/u64/constants.rs#L129), which is exactly the same as the point used in the Bulletproofs implementation. The point is said to be the 'Ed25519 basepoint' but it is not clear if the point is equal to the one defined in [the RFC for Ed25519](https://datatracker.ietf.org/doc/html/rfc8032) or the base point for Curve25519 given by [SafeCurves](https://safecurves.cr.yp.to/base.html). The differences may be due to different encoding methods (dalek encoding of field elements is explained [here](https://doc-internal.dalek.rs/curve25519_dalek/backend/serial/u64/field/struct.FieldElement51.html)). The order of the base point [is said to be](https://github.com/zkcrypto/curve25519-dalek-ng/blob/763a0faaf54752b06702b39e2296173ab76c2204/src/backend/serial/u64/constants.rs#L95) the prime $2^{252} + 27742317777372353535851937790883648493$, which is the same as the order of the other 2 base points in the literature, and will produce a subgroup of co-factor 8 (which is what we what, essentially).
 
 $g_2$ is formed from the SHA3-512 hash of $g_1$ using [this function](https://github.com/zkcrypto/curve25519-dalek-ng/blob/763a0faaf54752b06702b39e2296173ab76c2204/src/ristretto.rs#L688), which claims that the that "the discrete log of the output point with respect to any other point should be unknown".
 
