@@ -41,9 +41,9 @@ These values can be set by $\mathcal{P}$
 Both the salts should be changed for each PoL generated. If this is not done then blinding factors & hashes for leaf nodes do not change across PoLs, so there are 2 possible ways of gaining some information:
 1. An attacker can detect which leaf node belongs to the same entity across 2 PoLs by matching up leaf node hashes. Of course they would need access to the leaf nodes of tree to be able to do this, so the attack can be minimized by sharing parts of the tree only with registered entities.
 2. If an entity's balance has changed from 1st to 2nd PoL then an attacker can guess the balance by dividing the commitments. Since the entity's balance is not an input to the hash function the attacker can first perform the above attack to locate leaf nodes that match to the same user, then do the division. The division attack goes like this:
-  1. Entity's 2 leaf node commitments are $c_u=g^{l_u}_1 g^{b_u}_2$ & $c'_u=g^{l'_u}_1 g^{b_u}_2$
-  2. Attacker divides the 2 to get $c=g^{l_u-l'_u}_1$
-  3. The liabilities generally have less than 64-bit security so the attacker can brute-force guess the value of $l_u-l'_u$, which gives the attacker insight into the trading actions taken by the entity
+    1. Entity's 2 leaf node commitments are $c_u=g^{l_u}_1 g^{b_u}_2$ & $c'_u=g^{l'_u}_1 g^{b_u}_2$
+    2. Attacker divides the 2 to get $c=g^{l_u-l'_u}_1$
+    3. The liabilities generally have less than 64-bit security so the attacker can brute-force guess the value of $l_u-l'_u$, which gives the attacker insight into the trading actions taken by the entity
 
 ### Public data (PD)
 
@@ -78,52 +78,13 @@ The security & privacy proofs in the paper assume the tree is held by $\mathcal{
 
 Functions from the paper and their equivalents in the code:
 
-| Function in paper | Description                 | Equivalents in code                                                                                                                                  |
-|:------------------|:----------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------|
-| Setup             | Produces the PD & SD tuples | `DapolTree::public_root_data`<br>`DapolTree::root_hash`<br>`DapolTree::root_commitment`<br>`DapolTree::master_secret`<br>`DapolTree::entity_mapping` |
-|                   |                             |                                                                                                                                                      |
-|                   |                             |                                                                                                                                                      |
-|                   |                             |                                                                                                                                                      |
-|                   |                             |                                                                                                                                                      |
-
-
-#### Setup
-
-Produces the Public Data (root hash, root commitment) & Secret Data (master secret, leaf node mapping) tuples.
-
-Code equivalents:
-- `DapolTree::public_root_data`, which is made up of these 2:
-  - `DapolTree::root_hash`
-  - `DapolTree::root_commitment`
-- `DapolTree::master_secret`
-- `DapolTree::entity_mapping`
-
-#### ProveTot
-
-Reveals the blinding factor and the liability sum.
-
-Code equivalents:
-- `DapolTree::secret_root_data`, which is made up of these 2:
-  - `DapolTree::root_liability`
-  - `DapolTree::root_blinding_factor**
-
-#### VerifyTot
-
-Checks that Public Data corresponds to the Secret Data.
-
-Code equivalent: `DapolTree::verify_root_commitment`
-
-#### Prove
-
-Inclusion proof generation for an entity.
-
-Code equivalent: `DapolTree::generate_inclusion_proof`
-
-#### Verify
-
-Verify inclusion proof.
-
-Code equivalent: `InclusionProof::verify`
+| Function in paper | Description                                            | Equivalents in code                                                                                                                                  |
+|:------------------|:-------------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| Setup             | Produces the PD & SD tuples                            | `DapolTree::public_root_data`<br>`DapolTree::root_hash`<br>`DapolTree::root_commitment`<br>`DapolTree::master_secret`<br>`DapolTree::entity_mapping` |
+| ProveTot          | Reveals the blinding factor and the liability sum      | `DapolTree::secret_root_data`<br>`DapolTree::root_liability`<br>`DapolTree::root_blinding_factor`                                                    |
+| VerifyTot         | Checks that Public Data corresponds to the Secret Data | `DapolTree::verify_root_commitment`                                                                                                                  |
+| Prove             | Inclusion proof generation for an entity               | `DapolTree::generate_inclusion_proof`                                                                                                                |
+| Verify            | Verify inclusion proof                                 |  `InclusionProof::verify`                                                                                                                                                    |
 
 
 ## Dependencies
