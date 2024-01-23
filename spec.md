@@ -126,11 +126,22 @@ $g_2$ is formed from the SHA3-512 hash of $g_1$ using [this function](https://gi
 
 ## Code details
 
-TODO
+### General practices followed
 
-A hash map is used to store the nodes when building the tree
+When it comes to error handling this is the convention followed:
+- If a bug is found in the code then it will `panic!`. Example of bug detection: there are invariant checks done to make sure that the code is in an expected state; if one of these fails then it is assumed a bug was found.
+- Malformed parameters result in an `Err` being returned.
+- `Err` values returned from libraries are propagated up as such.
 
-panic if there is a bug in the code. if the input is incorrect then return an error result, so that calling code can take action.
+### Node storage
+
+As the tree is being build the nodes are stored in a hash map (specifically the concurrent hashmap: [Dashmap](https://docs.rs/dashmap/latest/dashmap/)). This data structure allows threads to easily just throw nodes into storage without worrying about which index they would live at (which is a rather expensive thing to calculate ahead of time), and offers the best read performance when the tree is to be used post-build for generating inclusion proofs.
+
+The code offers variability in the number of nodes stored. If the height of the tree is large (~32) & the number of users is many (~100M) then the total memory usage is going to be large (~300GB). If less nodes are stored then this value can be lowered. Storing less nodes means that inclusion proofs will take longer to be generated because the nodes not stored will have to be constructed again, but this is this the trade-off.
+
+The problem with node storage is that it is not permanent. If the machine or the process is shut down then the tree data is cleared. After building the tree it needs to be used to generate inclusion proofs on demand, and there cannot be a long wait time for requests. One option is to serialize the tree after building it, and then deserialize it on-demand when an inclusion proof is needed. There is functionality in the code for serde, but for large trees the time to deserialize is longer than the time to build the tree from scratch (due to the sequential nature of the deserialization library), so this is not a realistic option at all. Currently the only viable option is to keep the process running so that the tree lives in memory, ready to receive inclusion proof requests. There are some ways around this:
+1. Serialize to a file that allows concurrent read/write. This option would not affect the tree build & inclusion proof generation performance, but this adds overhead it's not clear how fast the (de)serialization process would be.
+2. Use a database to store the nodes, whether that be a database on the machine or one in the cloud. This would negatively affect tree build & inclusion performance, but once the database has been created there is no more overhead required so inclusion proofs can be generated on-demand in reasonable time.
 
 ### Limits & types
 
@@ -162,8 +173,4 @@ The paper uses term "idx" but code uses a Cartesian plane coordinate system. Pic
 - The y-coord for the root node is $H-1$
 - The x-coord for the root node is $0$
 For trees that are not **full** (i.e. only **complete**) there will be gaps along the horizontal lines where there are no nodes i.e. for each y-coord in the integer range $y_0 \in [0,H-1]$ there will be at least 1 node with coord $(x,y_0)$, but, for some $y_0 \in [0,H-1]$, not every x-coord in the integer range $x_0 \in [0,2^{y_0}]$ will yield a node with coord $(x_0,y_0)$.
-
-### Knobs $\mathcal{P}$ can use to adjust efficiency trade-offs
-
-Store depth TODO
 
