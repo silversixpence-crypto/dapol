@@ -40,8 +40,8 @@ These values can be set by $\mathcal{P}$:
 
 #### Note on the salts
 
-Both the salts should be changed for each PoL generated. If this is not done then blinding factors & hashes for leaf nodes do not change across PoLs, so there are 2 possible ways of gaining some information:
-1. An attacker can detect which leaf node belongs to the same entity across 2 PoLs by matching up leaf node hashes. Of course they would need access to the leaf nodes of tree to be able to do this, so the attack can be minimized by sharing parts of the tree only with registered entities.
+Both the salts should be changed for each PoL generated. If this is not done then blinding factors & hashes for leaf nodes do not change across PoLs, so there are 2 possible ways an attacker can gain some information:
+1. An attacker can detect which leaf node belongs to the same entity across 2 PoLs by matching up leaf node hashes. Of course they would need access to the leaf nodes of the tree to be able to do this, so the attack can be minimized by sharing parts of the tree only with registered entities.
 2. If an entity's balance has changed from 1st to 2nd PoL then an attacker can guess the balance by dividing the commitments. Since the entity's balance is not an input to the hash function the attacker can first perform the above attack to locate leaf nodes that match to the same user, then do the division. The division attack goes like this:
     1. Entity's 2 leaf node commitments are $c_u=g^{l_u}_1 g^{b_u}_2$ & $c'_u=g^{l'_u}_1 g^{b_u}_2$
     2. Attacker divides the 2 to get $c=g^{l_u-l'_u}_1$
@@ -49,7 +49,7 @@ Both the salts should be changed for each PoL generated. If this is not done the
 
 ### Public data (PD)
 
-Each tree in DAPOL+ has a PD tuple which needs to be posted on a PBB for the PoL protocol to function properly. The PD tuple consists of the hash & Pedersen commitment of the root node: $PD = (C_{\text{root}}, H_{\text{root}})$.
+Each tree in DAPOL+ has a PD tuple which needs to be posted on a PBB for the PoL protocol to function properly. The PD tuple consists of the hash & Pedersen commitment of the root node: $PD = (h_{\text{root}}, c_{\text{root}})$.
 
 ### Secret data (SD)
 
@@ -67,7 +67,7 @@ $M$ must be seen only by $\mathcal{P}$ because exposing this value would mean an
 7. $\mathcal{A}$ guesses $l_u$ and calculates $c_u=g^{l_u}_1 g^{b_u}_2$
 8. If $c_u$ is equal to the commitment of the leaf node then $\mathcal{A}$ has guessed $l_u$ correctly, otherwise go back to the previous step
 
-The paper advises to keep $M$ the same across PoLs so that entities only need to request their verification key $w_u = \text{KDF}(M, \text{id}_u)$ from the exchange once, and then reuse it to do verification on all PoLs. Having the same master secret does not pose a security risk for $\mathcal{P}$ because it is only used to generate the verification keys for the entity, and it is passed through a key derivation function for this so that simply having the verification key does not allow one to guess the master secret in reasonable time. In order for this security to hold, however, it is important to have a master secret with high entropy ($>256$ bits).
+The paper advises to keep $M$ the same across PoLs so that entities only need to request their verification key $w_u = \text{KDF}(M, \text{id}_u)$ from the exchange once, and then reuse it to do verification on all PoLs. Having the same master secret does not pose a security risk for $\mathcal{P}$ because it is only used to generate the verification keys for the entity, and it is passed through a key derivation function for this so that simply having the verification key does not allow one to guess the master secret in reasonable time. In order for this security to hold, however, it is important to have a master secret with high entropy ($>128$ bits, max supported is $256$ bits).
 
 #### Entity mapping $\epsilon$
 
@@ -87,9 +87,9 @@ Functions from the paper and their equivalents in the code:
 |:------------------|:-------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Setup             | Produces the PD & SD tuples                            | `DapolTree::new(...) -> DapolTree`<br>`DapolTree::public_root_data(DapolTree) -> (Hash, RistrettoPoint)`<br>`DapolTree::master_secret(DapolTree) -> Secret`<br>`DapolTree::entity_mapping(DapolTree) -> HashMap<EntityId, u64>>` |
 | ProveTot          | Reveals the blinding factor and the liability sum      | `DapolTree::secret_root_data(DapolTree) -> (u64, curve25519::Scalar)`                                                                                                                                                            |
-| VerifyTot         | Checks that Public Data corresponds to the Secret Data | `DapolTree::verify_root_commitment`                                                                                                                                                                                              |
-| Prove             | Inclusion proof generation for an entity               | `DapolTree::generate_inclusion_proof`                                                                                                                                                                                            |
-| Verify            | Verify inclusion proof                                 | `InclusionProof::verify`                                                                                                                                                                                                         |
+| VerifyTot         | Checks that Public Data corresponds to the Secret Data | `DapolTree::verify_root_commitment(RootCommitment, RootBlindingFactor, RootLiability) -> bool`                                                                                                                                                                                              |
+| Prove             | Inclusion proof generation for an entity               | `DapolTree::generate_inclusion_proof(DapolTree) -> InclusionProof`                                                                                                                                                                                            |
+| Verify            | Verify inclusion proof                                 | `InclusionProof::verify(InclusionProof) -> bool`                                                                                                                                                                                                         |
 
 
 ## Dependencies
