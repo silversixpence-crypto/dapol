@@ -30,7 +30,7 @@ The following values are set automatically by the codebase:
 - $\mathbb{G}$ is the Ristretto Group for Curve25519 with the following generator elements
   - $g_1=$ [ED25519_BASEPOINT](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/backend/serial/u64/constants.rs#L129)
   - $g_2=\text{pointFromHash}(\text{hash}(g_1))$ (SHA3 is used as the hash function, and the Elligator map is used to turn the digest into an elliptic curve point, see [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/ristretto.rs#L688) for more details, also [Ristretto group section](#Ristretto))
-- $\mathcal{R}$ is the Bulletproofs protocol
+- $\mathcal{R}$ is the Bulletproofs protocol, also using the Ristretto Group for Curve25519
 - $N=2^H$ because this sets the highest possible upper bound
 
 These values can be set by $\mathcal{P}$:
