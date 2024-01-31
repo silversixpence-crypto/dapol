@@ -94,8 +94,8 @@ Generate proofs (proofs will live in the `./inclusion_proofs/` directory):
 
 Build a tree using cli args as apposed to a config file:
 ```bash
-# this will generate random secrets & 1000 random entities
-./target/release/dapol -vvv build-tree new --accumulator ndm-smt --height 16 --random-entities 1000
+# this will generate 1000 random entities
+./target/release/dapol -vvv build-tree new --accumulator ndm-smt --height 16 --random-entities 1000 --secrets-file ./examples/dapol_secrets_example.toml
 ```
 
 #### Proof generation
