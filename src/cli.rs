@@ -3,7 +3,7 @@
 //! See [MAIN_LONG_ABOUT] for more information.
 
 use clap::{command, Args, Parser, Subcommand};
-use clap_verbosity_flag::{Verbosity, WarnLevel};
+use clap_verbosity_flag::{Verbosity, InfoLevel};
 use patharg::{InputArg, OutputArg};
 use primitive_types::H256;
 
@@ -30,7 +30,7 @@ pub struct Cli {
     pub command: Command,
 
     #[command(flatten)]
-    pub verbose: Verbosity<WarnLevel>,
+    pub verbose: Verbosity<InfoLevel>,
 }
 
 #[derive(Debug, Subcommand)]
