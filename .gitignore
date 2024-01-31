@@ -12,3 +12,4 @@ Cargo.lock
 # Generated files
 **/*.dapoltree
 **/*.dapolproof
+inclusion_proofs/

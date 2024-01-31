@@ -225,15 +225,22 @@ impl InclusionProof {
         &self,
         entity_id: &EntityId,
         dir: PathBuf,
+        file_type: InclusionProofFileType,
     ) -> Result<PathBuf, InclusionProofError> {
         let mut file_name = entity_id.to_string();
         file_name.push('.');
-        file_name.push_str(SERIALIZED_PROOF_EXTENSION);
+        file_name.push_str(match file_type {
+            InclusionProofFileType::Binary => SERIALIZED_PROOF_EXTENSION,
+            InclusionProofFileType::Json => "json",
+        });
 
         let path = dir.join(file_name);
         info!("Serializing inclusion proof to path {:?}", path);
 
-        read_write_utils::serialize_to_bin_file(&self, path.clone())?;
+        match file_type {
+            InclusionProofFileType::Binary => read_write_utils::serialize_to_bin_file(&self, path.clone())?,
+            InclusionProofFileType::Json => read_write_utils::serialize_to_json_file(&self, path.clone())?,
+        }
 
         Ok(path)
     }
@@ -246,14 +253,76 @@ impl InclusionProof {
     /// 1. The file cannot be opened.
     /// 2. The [bincode] deserializer fails.
     pub fn deserialize(file_path: PathBuf) -> Result<InclusionProof, InclusionProofError> {
-        info!("Deserializing inclusion proof to path {:?}", file_path);
-        let proof: InclusionProof = read_write_utils::deserialize_from_bin_file(file_path)?;
-        Ok(proof)
+        let ext = file_path.extension().and_then(|s| s.to_str()).ok_or(
+            InclusionProofError::UnknownFileType(file_path.clone().into_os_string()),
+        )?;
+
+        info!("Deserializing inclusion proof from file {:?}", file_path);
+
+        match ext {
+            SERIALIZED_PROOF_EXTENSION => Ok(read_write_utils::deserialize_from_bin_file(file_path)?),
+            "json" => Ok(read_write_utils::deserialize_from_json_file(file_path)?),
+            _ => Err(InclusionProofError::UnsupportedFileType { ext: ext.into() }),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Supported (de)serialization file types.
+
+/// Supported file types for serialization.
+#[derive(Debug, Clone)]
+pub enum InclusionProofFileType {
+    /// Binary file format.
+    ///
+    /// Most efficient but not human readable, unless you have the gift.
+    Binary,
+
+    /// JSON file format.
+    ///
+    /// Not the most efficient but is human readable.
+    Json,
+}
+
+use std::str::FromStr;
+
+impl FromStr for InclusionProofFileType {
+    type Err = InclusionProofError;
+
+    fn from_str(ext: &str) -> Result<InclusionProofFileType, Self::Err> {
+        match ext.to_lowercase().as_str() {
+            "binary" => Ok(InclusionProofFileType::Binary),
+            "json" => Ok(InclusionProofFileType::Json),
+            _ => Err(InclusionProofError::UnsupportedFileType { ext: ext.into() }),
+        }
+    }
+}
+
+use clap::builder::{OsStr, Str};
+
+// From for OsStr (for the CLI).
+impl From<InclusionProofFileType> for OsStr {
+    fn from(file_type: InclusionProofFileType) -> OsStr {
+        OsStr::from(Str::from(file_type.to_string()))
+    }
+}
+
+impl std::fmt::Display for InclusionProofFileType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Default for InclusionProofFileType {
+    fn default() -> Self {
+        InclusionProofFileType::Binary
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 // Errors
+
+use std::ffi::OsString;
 
 /// Errors encountered when handling [InclusionProof].
 #[derive(thiserror::Error, Debug)]
@@ -266,6 +335,10 @@ pub enum InclusionProofError {
     RangeProofError(#[from] RangeProofError),
     #[error("Error serializing/deserializing file")]
     SerdeError(#[from] crate::read_write_utils::ReadWriteError),
+    #[error("The file type with extension {ext:?} is not supported")]
+    UnsupportedFileType { ext: String },
+    #[error("Unable to find file extension for path {0:?}")]
+    UnknownFileType(OsString),
 }
 
 #[derive(thiserror::Error, Debug)]

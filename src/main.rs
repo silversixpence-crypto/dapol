@@ -7,7 +7,7 @@ use dapol::{
     cli::{BuildKindCommand, Cli, Command},
     initialize_machine_parallelism,
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr, LogOnErrUnwrap},
-    AggregationFactor, DapolConfig, DapolConfigBuilder, DapolTree, EntityIdsParser, InclusionProof,
+    AggregationFactor, DapolConfig, DapolConfigBuilder, DapolTree, EntityIdsParser, InclusionProof, InclusionProofFileType,
 };
 use patharg::InputArg;
 
@@ -107,7 +107,7 @@ fn main() {
                         .generate_inclusion_proof(&entity_id)
                         .log_on_err_unwrap();
 
-                    proof.serialize(&entity_id, dir.clone()).log_on_err_unwrap();
+                    proof.serialize(&entity_id, dir.clone(), InclusionProofFileType::Json).log_on_err_unwrap();
                 }
             }
 
@@ -130,6 +130,7 @@ fn main() {
             entity_ids,
             tree_file,
             range_proof_aggregation,
+            file_type,
         } => {
             let dapol_tree = DapolTree::deserialize(
                 tree_file
@@ -167,7 +168,7 @@ fn main() {
                     .generate_inclusion_proof_with(&entity_id, aggregation_factor.clone())
                     .log_on_err_unwrap();
 
-                proof.serialize(&entity_id, dir.clone()).log_on_err_unwrap();
+                proof.serialize(&entity_id, dir.clone(), file_type.clone()).log_on_err_unwrap();
             }
         }
         Command::VerifyInclusionProof {
