@@ -144,7 +144,7 @@ pub enum BuildKindCommand {
         max_thread_count: MaxThreadCount,
 
         #[arg(short, long, value_name = "FILE_PATH", long_help = SECRETS_HELP)]
-        secrets_file: Option<InputArg>,
+        secrets_file: InputArg,
 
         #[command(flatten)]
         entity_source: EntitySource,

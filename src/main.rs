@@ -65,7 +65,7 @@ fn main() {
                         entity_source.entities_file.and_then(|arg| arg.into_path()),
                     )
                     .num_random_entities_opt(entity_source.random_entities)
-                    .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
+                    .secrets_file_path_opt(secrets_file.into_path())
                     .build()
                     .log_on_err_unwrap()
                     .parse()
