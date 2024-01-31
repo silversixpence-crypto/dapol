@@ -3,7 +3,7 @@
 //! See [MAIN_LONG_ABOUT] for more information.
 
 use clap::{command, Args, Parser, Subcommand};
-use clap_verbosity_flag::{Verbosity, WarnLevel};
+use clap_verbosity_flag::{InfoLevel, Verbosity};
 use patharg::{InputArg, OutputArg};
 use primitive_types::H256;
 
@@ -12,8 +12,9 @@ use std::str::FromStr;
 use crate::{
     accumulators::AccumulatorType,
     binary_tree::Height,
+    inclusion_proof,
     percentage::{Percentage, ONE_HUNDRED_PERCENT},
-    MaxLiability, MaxThreadCount, Salt,
+    InclusionProofFileType, MaxLiability, MaxThreadCount, Salt,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -30,7 +31,7 @@ pub struct Cli {
     pub command: Command,
 
     #[command(flatten)]
-    pub verbose: Verbosity<WarnLevel>,
+    pub verbose: Verbosity<InfoLevel>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -87,6 +88,10 @@ pub enum Command {
         /// are aggregated using the Bulletproofs protocol.
         #[arg(short, long, value_parser = Percentage::from_str, default_value = ONE_HUNDRED_PERCENT, value_name = "PERCENTAGE")]
         range_proof_aggregation: Percentage,
+
+        /// File type for proofs (supported types: binary, json).
+        #[arg(short, long, value_parser = InclusionProofFileType::from_str, default_value = InclusionProofFileType::default())]
+        file_type: inclusion_proof::InclusionProofFileType,
     },
 
     /// Verify an inclusion proof.
@@ -144,7 +149,7 @@ pub enum BuildKindCommand {
         max_thread_count: MaxThreadCount,
 
         #[arg(short, long, value_name = "FILE_PATH", long_help = SECRETS_HELP)]
-        secrets_file: Option<InputArg>,
+        secrets_file: InputArg,
 
         #[command(flatten)]
         entity_source: EntitySource,

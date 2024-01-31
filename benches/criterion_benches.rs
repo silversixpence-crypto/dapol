@@ -15,7 +15,7 @@ use criterion::{criterion_group, criterion_main};
 use criterion::{BenchmarkId, Criterion, SamplingMode};
 use statistical::*;
 
-use dapol::{DapolConfigBuilder, DapolTree, InclusionProof, Secret};
+use dapol::{DapolConfigBuilder, DapolTree, InclusionProof, Secret, InclusionProofFileType};
 
 mod inputs;
 use inputs::{max_thread_counts_greater_than, num_entities_in_range, tree_heights_in_range};
@@ -292,7 +292,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
             std::fs::create_dir_all(dir.clone()).unwrap();
             let path = proof
                 .expect("Proof should be set")
-                .serialize(entity_id, dir)
+                .serialize(entity_id, dir, InclusionProofFileType::Binary)
                 .unwrap();
             let file_size = std::fs::metadata(path)
                 .expect("Unable to get serialized tree metadata for {path}")

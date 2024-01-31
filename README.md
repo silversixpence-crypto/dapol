@@ -40,29 +40,21 @@ See the [examples](https://github.com/silversixpence-crypto/dapol/examples) dire
 
 ### CLI
 
-There is no downloadable executable ([yet](https://github.com/silversixpence-crypto/dapol/issues/110)) so the CLI has to be built from source. You will need to have the rust compiler installed:
+Install with cargo:
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs >> ./rustup-init.sh
-./rustup-init.sh -y --no-modify-path
-rm -f ./rustup-init.sh
-```
-
-For now you must clone the repo to use the CLI. Once you have cloned the repo build everything:
-```bash
-# run inside the repo
-cargo build --release
+cargo install dapol
 ```
 
 You can invoke the CLI like so:
 ```bash
-./target/release/dapol help
+dapol help
 ```
 
 The CLI offers 3 main operations: tree building, proof generation & proof verification. All options can be explored with:
 ```bash
-./target/release/dapol build-tree help
-./target/release/dapol gen-proofs help
-./target/release/dapol verify-proof help
+dapol build-tree help
+dapol gen-proofs help
+dapol verify-proof help
 ```
 
 #### Tree building
@@ -74,28 +66,28 @@ Building a tree can be done:
 
 Build a tree using config file (full log verbosity):
 ```bash
-./target/release/dapol -vvv build-tree config-file ./examples/dapol_config_example.toml
+dapol -vvv build-tree config-file ./examples/dapol_config_example.toml
 ```
 
 Add serialization:
 ```bash
-./target/release/dapol -vvv build-tree config-file ./examples/dapol_config_example.toml --serialize .
+dapol -vvv build-tree config-file ./examples/dapol_config_example.toml --serialize .
 ```
 
 Deserialize a tree from a file:
 ```bash
-./target/release/dapol -vvv build-tree deserialize <file>
+dapol -vvv build-tree deserialize <file>
 ```
 
 Generate proofs (proofs will live in the `./inclusion_proofs/` directory):
 ```bash
-./target/release/dapol -vvv build-tree config-file ./examples/dapol_config_example.toml --gen-proofs ./examples/entities_example.csv
+dapol -vvv build-tree config-file ./examples/dapol_config_example.toml --gen-proofs ./examples/entities_example.csv
 ```
 
 Build a tree using cli args as apposed to a config file:
 ```bash
-# this will generate random secrets & 1000 random entities
-./target/release/dapol -vvv build-tree new --accumulator ndm-smt --height 16 --random-entities 1000
+# this will generate 1000 random entities
+dapol -vvv build-tree new --accumulator ndm-smt --height 16 --random-entities 1000 --secrets-file ./examples/dapol_secrets_example.toml
 ```
 
 #### Proof generation
@@ -103,7 +95,11 @@ Build a tree using cli args as apposed to a config file:
 As seen above, the proof generation can be done via the tree build command, but it can also be done via its own command, which offers some more options around how the proofs are generated.
 
 ```bash
-./target/release/dapol -vvv gen-proofs --entity-ids ./examples/entities_example.csv --tree-file <serialized_tree_file>
+dapol -vvv gen-proofs --entity-ids ./examples/entities_example.csv --tree-file <serialized_tree_file>
+```
+
+```bash
+echo "david.martin@example.com" | dapol -vvv gen-proofs --tree-file examples/my_serialized_tree_for_testing.dapoltree --entitiy-ids -
 ```
 
 The proof generation command only offers 1 way to inject the tree (deserialization), as apposed to the tree build which offers different options.
@@ -111,7 +107,7 @@ The proof generation command only offers 1 way to inject the tree (deserializati
 #### Proof verification
 
 ```bash
-./target/release/dapol -vvv verify-proof --file-path <inclusion_proof_file> --root-hash <hash>
+dapol -vvv verify-proof --file-path <inclusion_proof_file> --root-hash <hash>
 ```
 
 The root hash is logged out at info level when the tree is built or deserialized.

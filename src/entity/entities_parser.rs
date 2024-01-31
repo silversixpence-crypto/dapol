@@ -170,10 +170,6 @@ pub enum EntitiesParserError {
     UnsupportedFileType { ext: String },
     #[error("Error opening or reading CSV file")]
     CsvError(#[from] csv::Error),
-    #[error(
-        "The given entity ID ({id:?}) is longer than the max allowed {ENTITY_ID_MAX_BYTES} bytes"
-    )]
-    EntityIdTooLongError { id: String },
 }
 
 // -------------------------------------------------------------------------------------------------
