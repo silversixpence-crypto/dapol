@@ -138,17 +138,27 @@ fn main() {
             )
             .log_on_err_unwrap();
 
-            // TODO for entity IDs: accept either path or stdin
-            let entity_ids = EntityIdsParser::from(
-                entity_ids
-                    .into_path()
-                    .expect("Expected file path, not stdin"),
-            )
+            let entity_ids = if entity_ids.is_path() {
+                EntityIdsParser::from(
+                    entity_ids
+                        .into_path()
+                        .expect("Expected file path, not stdin"),
+                )
+            } else {
+                EntityIdsParser::from_str(
+                    &entity_ids
+                        .read_to_string()
+                        .expect("Problem reading from stdin"),
+                )
+                .log_on_err_unwrap()
+            }
             .parse()
             .log_on_err_unwrap();
 
             let dir = PathBuf::from("./inclusion_proofs/");
-            std::fs::create_dir(dir.as_path()).log_on_err_unwrap();
+            if !dir.exists() {
+                std::fs::create_dir(dir.as_path()).log_on_err_unwrap();
+            }
 
             let aggregation_factor = AggregationFactor::Percent(range_proof_aggregation);
 
