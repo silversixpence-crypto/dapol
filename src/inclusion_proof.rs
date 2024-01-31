@@ -251,7 +251,8 @@ impl InclusionProof {
     ///
     /// An error is logged and returned if
     /// 1. The file cannot be opened.
-    /// 2. The [bincode] deserializer fails.
+    /// 2. The deserializer fails.
+    /// 3. The file extension is not supported.
     pub fn deserialize(file_path: PathBuf) -> Result<InclusionProof, InclusionProofError> {
         let ext = file_path.extension().and_then(|s| s.to_str()).ok_or(
             InclusionProofError::UnknownFileType(file_path.clone().into_os_string()),

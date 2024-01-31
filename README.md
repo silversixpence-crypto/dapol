@@ -98,6 +98,10 @@ As seen above, the proof generation can be done via the tree build command, but 
 dapol -vvv gen-proofs --entity-ids ./examples/entities_example.csv --tree-file <serialized_tree_file>
 ```
 
+```bash
+echo "david.martin@example.com" | dapol -vvv gen-proofs --tree-file examples/my_serialized_tree_for_testing.dapoltree --entitiy-ids -
+```
+
 The proof generation command only offers 1 way to inject the tree (deserialization), as apposed to the tree build which offers different options.
 
 #### Proof verification

@@ -46,14 +46,12 @@ impl EntityIdsParser {
     /// - Parse the value as a string list using `serde_json`
     /// - An error is returned if:
     ///   a) deserialization using `serde_json` fails
+    ///
+    /// If neither are set then an error is returned.
     pub fn parse(self) -> Result<Vec<EntityId>, EntityIdsParserError> {
         if let Some(path) = self.path {
             EntityIdsParser::parse_csv(path)
         } else if let Some(entity_ids_list) = self.entity_ids_list {
-            info!("list {:?}", entity_ids_list);
-            // let mut json_styled = "{".to_string();
-            // json_styled.push_str(&entity_ids_list);
-            // json_styled.push_str("}");
             EntityIdsParser::parse_list(entity_ids_list)
         } else {
             Err(EntityIdsParserError::NeitherPathNorListSet)
@@ -61,20 +59,18 @@ impl EntityIdsParser {
     }
 
     fn parse_list(mut entity_ids_list: String) -> Result<Vec<EntityId>, EntityIdsParserError> {
+        // Remove trailing newline if it exists.
         if entity_ids_list.chars().nth_back(0).map_or(false, |c| c == '\n') {
             entity_ids_list.pop();
         }
 
-        // let raw_vec: Vec<String> = serde_json::from_str(entity_ids_json)?;
+        // Assume the input is a comma-separated list.
         let parts = entity_ids_list.split(',');
-        //let entity_ids = parts.collect::<Vec<&str>>();
 
-        let mut entity_ids = Vec::<EntityId>::new();// = Vec::with_capacity(raw_vec.len());
+        let mut entity_ids = Vec::<EntityId>::new();
         for part in parts {
             entity_ids.push(EntityId::from_str(&part)?)
         }
-
-        info!("entity ids {:?}", entity_ids);
 
         Ok(entity_ids)
     }
