@@ -309,7 +309,7 @@ impl NdmSmt {
             .entity_mapping
             .get(entity_id)
             .and_then(|leaf_x_coord| self.binary_tree.get_leaf_node(*leaf_x_coord))
-            .ok_or(NdmSmtError::EntityIdNotFound)?;
+            .ok_or(NdmSmtError::EntityIdNotFound(entity_id.clone()))?;
 
         let path_siblings = PathSiblings::build_using_multi_threaded_algorithm(
             &self.binary_tree,
@@ -394,8 +394,8 @@ pub enum NdmSmtError {
     InclusionProofPathSiblingsGenerationError(#[from] crate::binary_tree::PathSiblingsBuildError),
     #[error("Inclusion proof generation failed")]
     InclusionProofGenerationError(#[from] crate::inclusion_proof::InclusionProofError),
-    #[error("Entity ID not found in the entity mapping")]
-    EntityIdNotFound,
+    #[error("Entity ID {0:?} not found in the entity mapping")]
+    EntityIdNotFound(EntityId),
     #[error("Entity ID {0:?} was duplicated")]
     DuplicateEntityIds(EntityId),
 }
