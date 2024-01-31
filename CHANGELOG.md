@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## v0.3.1 (2024-01-20)
+
+- Minor updates to the CLI [PR 154](https://github.com/silversixpence-crypto/dapol/pull/154)
+
 ## v0.3.0 (2024-01-20)
 
 - Adjust API to read better using DapolTree instead of Accumulator [36dd58f](https://github.com/silversixpence-crypto/dapol/commit/36dd58fcd9cd2100ac7a1c4a7010faab3397770f). Also included in this change:
