@@ -30,11 +30,18 @@ General:
 
 Formulas:
 - leaf node (for some user $u$):
-  - $w_u=\text{KDF}(M,\text{id}_u)$ - entity's secret value
+  - $w_u=\text{KDF}(M,\text{id}_u)$ - entity's secret
   - $s_u=\text{KDF}(w_u, S_{\text{hash}})$ - entity's salt value
   - $b_u=\text{KDF}(w_u, S_{\text{com}})$ - entity's blinding factor
   - $c_u=g_1^{l_u}g_2^{b_u}$ - entity's Pedersen commitment
-  - $h_u=\text{H}(\text{"leaf"} | \text{id}_u | s_u) - entity's node hash
+  - $h_u=\text{H}(\text{"leaf"} | \text{id}_u | s_u)$ - entity's hash
+- padding node:
+  - $\text{idx}$ - node coordinate
+  - $w=\text{KDF}(M,\text{idx})$ - node's secret
+  - $s=\text{KDF}(w_u, S_{\text{hash}})$ - node's salt value
+  - $b=\text{KDF}(w_u, S_{\text{com}})$ - node's blinding factor
+  - $c=g_1^0g_2^{b_u}$ - node's Pedersen commitment
+  - $h=\text{H}(\text{"pad"} | \text{idx} | s)$ - node's hash
 
 ## How Proof of Liabilities (PoL) works
 
