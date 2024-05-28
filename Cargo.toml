@@ -71,6 +71,9 @@ arbitrary = { version = "1", optional = true, features = ["derive"] }
 
 [features]
 fuzzing = ["rand/small_rng", "arbitrary"]
+
+# Used for exposing functionality used in testing so that calling libraries may
+# use it too. Example: random seeding for deterministic output.
 testing = []
 
 [dev-dependencies]
