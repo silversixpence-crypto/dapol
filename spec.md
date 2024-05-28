@@ -1,13 +1,37 @@
-# Spec for dapol codebase
+# Spec for [dapol](https://github.com/silversixpence-crypto/dapol) codebase
 
-DAPOL+ protocol introduced in the "Generalized Proof of Liabilities" by Yan Ji and Konstantinos Chalkias ACM CCS 2021 paper, available [here](https://eprint.iacr.org/2021/1350).
+## Intro
+
+This repo is a Rust implementation of the DAPOL+ protocol, which was introduced in the "Generalized Proof of Liabilities" ACM CCS 2021 paper, by Yan Ji and Konstantinos Chalkias (available [here](https://eprint.iacr.org/2021/1350)).
+
+DAPOL+ (Distributed Auditing Proof of Liabilities) is a protocol around a Merkle Sum Tree that allows an entity to cryptographically commit to it's liabilities in a way that maintains data privacy and verifiability. Some examples of where this protocol is useful:
+- Centralized cryptocurrency exchange uses DAPOL+ to commit to the digital asset balances it owes it's users, and the users can verify that their balances are correctly represented in the tree
+- Hospitals commit to their COVID case count, and their patients can check that their case was correctly recorded
+
+This repo is part of a larger Proof of Reserves project, and more information on that you can check out this [top-level doc for the project](https://hackmd.io/p0dy3R0RS5qpm3sX-_zreA).
 
 The implementation is written in Rust due to a) the readily available libraries for Bulletproofs & other ZK crypto, and b) the performance benefits, as building the tree is an expensive computation for real-world input sizes.
 
-**Key:**
-- Entity (aka user) - Represents a single unit of the external data that is to be modeled by the PoL. Each entity has an ID ($\text{id}_u$) and a liability ($l_u$).
+## How Proof of Liabilities (PoL) works
+
+This is a brief explanation of PoL. For a deeper dive on Proof of Liabilities you can check out [this blog](https://reservex.io/blogs/1). For a full formulation of DAPOL+ see the original paper.
+
+**KEY:**
+- Entity (aka user) - Represents a single unit of the external data that is to be modeled by the protocol. Each entity has an ID ($\text{id}_u$) and a liability ($l_u$).
 - $\mathcal{P}$ - constructor of the tree (aka prover)
 - PBB - (public bulletin board)
+
+Let's explain with the example of the cryptocurrency exchange mentioned above: $\mathcal{P}$ is an exchange that has some users. The users send the exchange fiat currency in exchange for cryptocurrency. The exchange custodies the cryptocurrency on behalf of its users (meaning that the users do not have control of the funds, the exchange does). We say the exchange has a **liability** to each of its users. The liability is a positive integer representing the exact amount of cryptocurrency that the exchange is holding for them. The liability should only change when the user takes action, but since the exchange owns the data they could maliciously change the data to their advantage. The users thus request that the exchange cryptographically commit to its liabilities such that:
+- the commitment can be posted on a PBB
+- the exchange cannot change any liability after the commitment is posted on the PBB
+- the total liability sum is calculated as part of the commitment
+- users can check what their liability is in the commitment
+- user data stays hidden throughout the whole process
+
+Here is a simplified version of the Proof of Liabilities function (see the paper for a more detailed formulation):
+$$
+P(\{\text{users' liabilities}\}) = \text{commitment}
+$$
 
 ## PoL data, functions & parameters
 
