@@ -1,6 +1,6 @@
 [package]
 name = "dapol"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Stenton Mayne <stentonian@protonmail.com>"]
 edition = "2021"
 description = "DAPOL+ Proof of Liabilities protocol"
