@@ -73,13 +73,14 @@ TODO
 
 DAPOL+ requires the following public parameters to be set before generating any trees:
 
-$$\left( ( \mathbb{G}, g_1, g_2 ), \mathcal{R}, N, \text{MaxL}, H, S_{\text{com}}, S_{\text{hash}} \right)$$
+$$\left( ( \mathbb{G}, g_1, g_2 ), \mathcal{R}, N, \text{MaxL}, H, \text{Hash}, S_{\text{com}}, S_{\text{hash}} \right)$$
 
 where
 - $\mathbb{G}$ is a group of prime order, with generators $g_1$ & $g_2$ s.t. their relative logarithm is unknown
 - $N$ is the upper bound on the number of entities i.e. if $n$ is the number of entities to be modeled by the tree, then $n < N$ (note that we must have $N \le 2^H$ since that is the maximum number of bottom layer leaf nodes in a binary tree)
 - $\text{MaxL}$ is the maximum liability of any single entity, and is used to determine the upper bound for the range proof: $N \times \text{MaxL}$
 - $H$ is the height of the tree
+- $\text{Hash}$ is the hash function used to construct the Merkle tree
 - $S_{\text{com}}$ is the salt used to calculate a leaf/padding node's Pedersen commitment
 - $S_{\text{hash}}$ is the salt used to calculate a leaf/padding node's hash
 - $\mathcal{R}$ is the range proof protocol
@@ -88,8 +89,9 @@ The following values are set automatically by the codebase:
 - $\mathbb{G}$ is the Ristretto Group for Curve25519 with the following generator elements
   - $g_1=$ [ED25519_BASEPOINT](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/backend/serial/u64/constants.rs#L129)
   - $g_2=\text{pointFromHash}(\text{hash}(g_1))$ (SHA3 is used as the hash function, and the Elligator map is used to turn the digest into an elliptic curve point, see [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/ristretto.rs#L688) for more details, or further down in the [Ristretto group section](#Ristretto))
-- $\mathcal{R}$ is the [Bulletproofs](https://eprint.iacr.org/2017/1066.pdf) protocol, also using the Ristretto Group for Curve25519
 - $N=2^H$ because this sets the highest possible upper bound
+- $\text{Hash}$ is set to the blake3 hash function
+- $\mathcal{R}$ is the [Bulletproofs](https://eprint.iacr.org/2017/1066.pdf) protocol, also using the Ristretto Group for Curve25519
 
 These values can be set by $\mathcal{P}$:
 - $\text{MaxL}$ (default is $2^{32}$)
