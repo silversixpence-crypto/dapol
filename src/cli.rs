@@ -106,6 +106,11 @@ pub enum Command {
         /// Hash digest/bytes for the root node of the tree.
         #[arg(short, long, value_parser = H256::from_str, value_name = "BYTES")]
         root_hash: H256,
+
+        /// Create a json file containing all the path information, and print
+        /// the same path information to stdout.
+        #[arg(long, short, action)]
+        show_path: bool,
     },
 
     /// Verify the root node of a DAPOL tree.

@@ -34,6 +34,7 @@
 //! root node down are stored. So if `store_depth == height` then all the nodes
 //! are stored.
 
+use core::fmt;
 use std::fmt::Debug;
 use std::ops::Range;
 
@@ -69,7 +70,7 @@ const BUG: &str = "[Bug in multi-threaded builder]";
 /// - all x-coord <= max
 /// - checked for duplicates (duplicate if same x-coords)
 #[stime("info", "MultiThreadedBuilder::{}")]
-pub fn build_tree<C, F>(
+pub fn build_tree<C: fmt::Display, F>(
     height: Height,
     store_depth: u8,
     mut input_leaf_nodes: Vec<InputLeafNode<C>>,
@@ -141,11 +142,11 @@ where
 type Map<C> = DashMap<Coordinate, Node<C>>;
 
 #[derive(Serialize, Deserialize)]
-pub struct DashMapStore<C> {
+pub struct DashMapStore<C: fmt::Display> {
     map: Map<C>,
 }
 
-impl<C: Clone> DashMapStore<C> {
+impl<C: Clone + fmt::Display> DashMapStore<C> {
     pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         self.map.get(coord).map(|n| n.clone())
     }
@@ -164,7 +165,7 @@ impl<C: Clone> DashMapStore<C> {
 /// If all nodes satisfy `node.coord.x <= mid` then `Full` is returned.
 /// If no nodes satisfy `node.coord.x <= mid` then `Empty` is returned.
 // TODO can be optimized using a binary search
-fn num_nodes_left_of<C>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
+fn num_nodes_left_of<C: fmt::Display>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
     nodes
         .iter()
         .rposition(|leaf| leaf.coord.x <= x_coord_mid)
@@ -183,7 +184,7 @@ enum NumNodes {
     Partial(usize),
 }
 
-impl<C> Node<C> {
+impl<C: fmt::Display> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type `C` is defined, for example.
@@ -197,7 +198,7 @@ impl<C> Node<C> {
     }
 }
 
-impl<C: Mergeable> MatchedPair<C> {
+impl<C: Mergeable + fmt::Display> MatchedPair<C> {
     /// Create a pair of left and right sibling nodes from only 1 node and the
     /// padding node generation function.
     ///
@@ -388,7 +389,7 @@ impl RecursionParams {
 /// function anyway. If either case is reached then either there is a bug in the
 /// original calling code or there is a bug in the splitting algorithm in this
 /// function. There is no recovery from these 2 states so we panic.
-pub fn build_node<C, F>(
+pub fn build_node<C: fmt::Display, F>(
     params: RecursionParams,
     mut leaves: Vec<Node<C>>,
     new_padding_node_content: Arc<F>,

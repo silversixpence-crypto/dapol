@@ -9,7 +9,7 @@
 //! generic type, `C`.
 
 use serde::Serialize;
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 use crate::MaxThreadCount;
 
@@ -67,7 +67,7 @@ pub struct InputLeafNode<C> {
 // -------------------------------------------------------------------------------------------------
 // Implementations.
 
-impl<C> BinaryTreeBuilder<C>
+impl<C: fmt::Display> BinaryTreeBuilder<C>
 where
     C: Clone + Mergeable + 'static, /* The static is needed when the single threaded builder
                                      * builds the boxed hashmap. */
@@ -241,7 +241,7 @@ where
     }
 }
 
-impl<C> InputLeafNode<C> {
+impl<C: fmt::Display> InputLeafNode<C> {
     /// Convert the simpler node type to the actual Node type.
     pub fn into_node(self) -> Node<C> {
         Node {

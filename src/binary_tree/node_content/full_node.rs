@@ -154,7 +154,7 @@ impl FullNodeContent {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Implement Mergeable trait
+// Implement traits
 
 impl Mergeable for FullNodeContent {
     /// Returns the parent node content by merging two child node contents.
@@ -169,7 +169,7 @@ impl Mergeable for FullNodeContent {
         let parent_blinding_factor = left_sibling.blinding_factor + right_sibling.blinding_factor;
         let parent_commitment = left_sibling.commitment + right_sibling.commitment;
 
-        // `hash = H(left.com | right.com | left.hash | right.hash`
+        // `hash = H(left.com | right.com | left.hash | right.hash)`
         let parent_hash = {
             let mut hasher = Hasher::new();
             hasher.update(left_sibling.commitment.compress().as_bytes());
@@ -185,6 +185,24 @@ impl Mergeable for FullNodeContent {
             commitment: parent_commitment,
             hash: parent_hash,
         }
+    }
+}
+
+use std::fmt;
+
+impl fmt::Display for FullNodeContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // This allows us to get the same format for hash & commitment.
+        // If we just try convert the compressed RistrettoPoint to string we
+        // get a [u8; 32] array, while the H256 type formats to a nice hex
+        // string.
+        let commitment_bytes = H256::from_slice(self.commitment.compress().as_bytes());
+
+        write!(
+            f,
+            "(liability: {}, blinding factor: {:?}, hash: {:?}, commitment: {:?})",
+            self.liability, self.blinding_factor, self.hash, commitment_bytes
+        )
     }
 }
 
