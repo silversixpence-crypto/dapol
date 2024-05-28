@@ -27,8 +27,13 @@ use crate::{
 };
 
 use log::info;
+use serde::{Deserialize, Serialize};
 
-use std::{fmt::Debug, path::PathBuf};
+use std::{
+    ffi::OsString,
+    fmt::{self, Debug},
+    path::PathBuf,
+};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and build functions.
@@ -376,8 +381,6 @@ impl From<Node<HiddenNodeContent>> for PrettyNode {
     }
 }
 
-use std::ffi::OsString;
-
 impl PathSiblings<HiddenNodeContent> {
     /// Write the path & sibling nodes to a json file.
     ///
@@ -430,8 +433,6 @@ impl<C: fmt::Display> PathSiblings<C> {
     }
 }
 
-use std::fmt;
-
 impl<C: fmt::Display> fmt::Display for PathSiblings<C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(
@@ -446,8 +447,6 @@ impl<C: fmt::Display> fmt::Display for PathSiblings<C> {
 
 // -------------------------------------------------------------------------------------------------
 // Errors.
-
-use serde::{Deserialize, Serialize};
 
 #[derive(thiserror::Error, Debug)]
 pub enum PathSiblingsBuildError {

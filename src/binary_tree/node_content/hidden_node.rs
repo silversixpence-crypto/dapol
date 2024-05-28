@@ -142,7 +142,12 @@ use std::fmt;
 
 impl fmt::Display for HiddenNodeContent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // This allows us to get the same format for hash & commitment.
+        // If we just try convert the compressed RistrettoPoint to string we
+        // get a [u8; 32] array, while the H256 type formats to a nice hex
+        // string.
         let commitment_bytes = H256::from_slice(self.commitment.compress().as_bytes());
+
         write!(f, "(hash: {:x?}, commitment: {:?})", self.hash, commitment_bytes)
     }
 }
