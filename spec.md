@@ -23,7 +23,7 @@ General:
 - Padding node - a node in the MST that has no children and is not associated with an entity
 - Pedersen commitment - a type of homomorphic cryptographic commitment and/or encryption scheme (see [original paper](https://link.springer.com/chapter/10.1007/3-540-46766-1_9) or more practical explanation [here](https://asecuritysite.com/zero/ped))
 - $\text{KDF}$ - Key Derivation Function
-- $\text{Hash}$ - hash function
+- $\text{Hash}$ - hash function used for the MST construction
 - $M$ - master secret
 - $S_{\text{com}}$ - public salt for blinding factor for Pedersen commitments
 - $S_{\text{hash}}$ - public salt for the hash function
@@ -36,12 +36,12 @@ Formulas:
   - $c_u=g_1^{l_u}g_2^{b_u}$ - entity's Pedersen commitment
   - $h_u=\text{H}(\text{"leaf"} | \text{id}_u | s_u)$ - entity's hash
 - padding node:
-  - $\text{idx}$ - node coordinate
-  - $w=\text{KDF}(M,\text{idx})$ - node's secret
-  - $s=\text{KDF}(w_u, S_{\text{hash}})$ - node's salt value
-  - $b=\text{KDF}(w_u, S_{\text{com}})$ - node's blinding factor
-  - $c=g_1^0g_2^{b_u}$ - node's Pedersen commitment
-  - $h=\text{H}(\text{"pad"} | \text{idx} | s)$ - node's hash
+  - $\text{idx}$ - pad's coordinate
+  - $w=\text{KDF}(M,\text{idx})$ - pad's secret
+  - $s=\text{KDF}(w, S_{\text{hash}})$ - pad's salt value
+  - $b=\text{KDF}(w, S_{\text{com}})$ - pad's blinding factor
+  - $c=g_1^0g_2^b$ - pad's Pedersen commitment
+  - $h=\text{H}(\text{"pad"} | \text{idx} | s)$ - pad's hash
 
 ## How Proof of Liabilities (PoL) works
 
@@ -96,8 +96,6 @@ These values can be set by $\mathcal{P}$:
 - $H$ (default is $32$)
 - Both the salts (default to being randomly generated using a CSPRNG)
 
-TODO b_u & l_u are mentioned here without definitions, we should define these (and also 'u')
-
 #### Note on the salts
 
 Both the salts should be changed for each PoL generated. If this is not done then blinding factors & hashes for leaf nodes do not change across PoLs, so there are 2 possible ways an attacker can gain some information:
@@ -108,8 +106,6 @@ Both the salts should be changed for each PoL generated. If this is not done the
     3. The liabilities generally have less than 64 bits of entropy so the attacker can guess the value of $l_u-l'_u$, which gives the attacker insight into the trading actions taken by the entity
 
 ### Public data (PD)
-
-TODO define h & c
 
 Each tree in DAPOL+ has a PD tuple which needs to be posted on a PBB for the PoL protocol to function properly. The PD tuple consists of the hash & Pedersen commitment of the root node: $PD = (h_{\text{root}}, c_{\text{root}})$.
 
@@ -156,11 +152,17 @@ Functions from the paper and their equivalents in the code:
 
 ## Dependencies
 
-The KDF protocol used is [HKDF-SHA256](https://datatracker.ietf.org/doc/html/rfc5869) with [this implementation](https://docs.rs/hkdf/latest/hkdf/). The implementation requires a hash function; [SHA256](https://docs.rs/sha2/latest/sha2/) is used.
-
-[blake3](https://docs.rs/blake3/latest/blake3/) is used as the hash function to construct the Merkle tree.
+### Randomness
 
 [`thread_rng` from rand](https://docs.rs/rand/latest/rand/rngs/struct.ThreadRng.html) is used as the CSPRNG for the shuffle algorithm for the NDM-SMT as well as generating random salts if $\mathcal{P}$ does not provide them.
+
+### KDF
+
+The KDF protocol used is [HKDF-SHA256](https://datatracker.ietf.org/doc/html/rfc5869) with [this implementation](https://docs.rs/hkdf/latest/hkdf/). The implementation requires a hash function; [SHA256](https://docs.rs/sha2/latest/sha2/) is used.
+
+### MST hash function
+
+[blake3](https://docs.rs/blake3/latest/blake3/) is used as the hash function to construct the Merkle tree.
 
 ### Bulletproofs
 
