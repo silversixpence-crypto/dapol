@@ -403,7 +403,7 @@ impl PathSiblings<HiddenNodeContent> {
             ));
         }
 
-        file_name.push("_path_information.json");
+        file_name.push(".path_information.json");
         let file_path = dir.join(file_name);
 
         let siblings = self.0.into_iter().map(PrettyNode::from).collect();
