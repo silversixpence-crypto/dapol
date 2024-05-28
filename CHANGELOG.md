@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## v0.3.2 (2024-05-28)
+
+- Added a spec [PR 153](https://github.com/silversixpence-crypto/dapol/pull/153)
+- Increased the length of entity ID from 256 to 512 bits [PR 162](https://github.com/silversixpence-crypto/dapol/pull/162)
+- Add option to verify API to print path information [PR 163](https://github.com/silversixpence-crypto/dapol/pull/163)
+
 ## v0.3.1 (2024-01-20)
 
 - Minor updates to the CLI [PR 154](https://github.com/silversixpence-crypto/dapol/pull/154)
