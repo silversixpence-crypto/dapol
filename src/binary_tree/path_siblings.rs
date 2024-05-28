@@ -320,9 +320,10 @@ impl<C: fmt::Display + Serialize> PathSiblings<C> {
 
         let mut output_str = String::new();
 
+        write!(&mut output_str, "\nPath information:\n")
+            .expect("[Bug in path to string conversion] Cannot write to string object");
         write!(&mut output_str, "\nNodes:\n{}", path_nodes_str)
             .expect("[Bug in path to string conversion] Cannot write to string object");
-
         write!(&mut output_str, "\nSiblings:\n{}", path_siblings_str)
             .expect("[Bug in path to string conversion] Cannot write to string object");
 
