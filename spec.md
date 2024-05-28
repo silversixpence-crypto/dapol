@@ -63,9 +63,12 @@ The exchange is expected to create many PoLs over time. Ideally at a fixed caden
 
 DAPOL+ uses a Merkle Sum Tree (a type of binary tree) as the underlying data structure. Each user's liability is a leaf node (encrypted as a Pedersen commitment) and the commitment is the root node.
 
-## Full process followed by $\mathcal{P}$ & its entities
+### Full process followed by $\mathcal{P}$ & its entities
 
-TODO
+1. $\mathcal{P}$ generates the MST using their database of liabilities
+2. $\mathcal{P}$ posts the root node of the MST on a PBB
+3. Users request inclusion proofs from $\mathcal{P}$, which $\mathcal{P}$ can generate using the MST
+4. Users use the inclusion proofs + the commitment on the PBB to do verification
 
 ## DAPOL+ data & parameters
 
