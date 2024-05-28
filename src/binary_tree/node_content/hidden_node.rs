@@ -110,7 +110,7 @@ impl From<FullNodeContent> for HiddenNodeContent {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Implement merge trait
+// Implement trait
 
 impl Mergeable for HiddenNodeContent {
     /// Returns the parent node content by merging two child node contents.
@@ -121,7 +121,7 @@ impl Mergeable for HiddenNodeContent {
     fn merge(left_sibling: &Self, right_sibling: &Self) -> Self {
         let parent_commitment = left_sibling.commitment + right_sibling.commitment;
 
-        // `hash = H(left.com | right.com | left.hash | right.hash`
+        // `hash = H(left.com | right.com | left.hash | right.hash)`
         let parent_hash = {
             let mut hasher = Hasher::new();
             hasher.update(left_sibling.commitment.compress().as_bytes());
@@ -135,6 +135,15 @@ impl Mergeable for HiddenNodeContent {
             commitment: parent_commitment,
             hash: parent_hash,
         }
+    }
+}
+
+use std::fmt;
+
+impl fmt::Display for HiddenNodeContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let commitment_bytes = H256::from_slice(self.commitment.compress().as_bytes());
+        write!(f, "(hash: {:x?}, commitment: {:?})", self.hash, commitment_bytes)
     }
 }
 

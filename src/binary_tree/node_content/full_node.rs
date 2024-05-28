@@ -154,7 +154,7 @@ impl FullNodeContent {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Implement Mergeable trait
+// Implement traits
 
 impl Mergeable for FullNodeContent {
     /// Returns the parent node content by merging two child node contents.
@@ -185,6 +185,19 @@ impl Mergeable for FullNodeContent {
             commitment: parent_commitment,
             hash: parent_hash,
         }
+    }
+}
+
+use std::fmt;
+
+impl fmt::Display for FullNodeContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let commitment_bytes = H256::from_slice(self.commitment.compress().as_bytes());
+        write!(
+            f,
+            "(liability: {}, blinding factor: {:?}, hash: {:?}, commitment: {:?})",
+            self.liability, self.blinding_factor, self.hash, commitment_bytes
+        )
     }
 }
 

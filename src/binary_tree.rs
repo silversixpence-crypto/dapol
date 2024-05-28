@@ -33,7 +33,7 @@
 //! `x` coordinate (their `y` coordinate will be 0).
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::fmt::{self, Debug};
 
 mod utils;
 
@@ -83,7 +83,7 @@ pub const MIN_RECOMMENDED_SPARSITY: u8 = 2;
 ///
 /// The generic type `C` is for the content contained within each node.
 #[derive(Serialize, Deserialize)]
-pub struct BinaryTree<C> {
+pub struct BinaryTree<C: fmt::Display> {
     root: Node<C>,
     store: Store<C>,
     height: Height,
@@ -93,7 +93,7 @@ pub struct BinaryTree<C> {
 /// The data contained in the node is completely generic, requiring only to have
 /// an associated merge function.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Node<C> {
+pub struct Node<C: fmt::Display> {
     pub coord: Coordinate,
     pub content: C,
 }
@@ -118,7 +118,7 @@ pub struct Coordinate {
 /// traits; for more details see
 /// [this issue](https://github.com/dtolnay/typetag/issues/1).
 #[derive(Serialize, Deserialize)]
-pub enum Store<C> {
+pub enum Store<C: fmt::Display> {
     MultiThreadedStore(multi_threaded::DashMapStore<C>),
     SingleThreadedStore(single_threaded::HashMapStore<C>),
 }
@@ -126,7 +126,7 @@ pub enum Store<C> {
 // -------------------------------------------------------------------------------------------------
 // Accessor methods.
 
-impl<C: Clone> BinaryTree<C> {
+impl<C: Clone + fmt::Display> BinaryTree<C> {
     pub fn height(&self) -> &Height {
         &self.height
     }
@@ -265,7 +265,7 @@ impl Coordinate {
     }
 }
 
-impl<C> Node<C> {
+impl<C: fmt::Display> Node<C> {
     /// Returns left if this node is a left sibling and vice versa for right.
     /// Since we are working with a binary tree we can tell if the node is a
     /// left sibling of the above layer by checking the x_coord modulus 2.
@@ -318,7 +318,7 @@ impl<C> Node<C> {
     }
 
     /// Convert a `Node<C>` to a `Node<B>`.
-    pub fn convert<B: From<C>>(self) -> Node<B> {
+    pub fn convert<B: From<C> + fmt::Display>(self) -> Node<B> {
         Node {
             content: self.content.into(),
             coord: self.coord,
@@ -326,7 +326,7 @@ impl<C> Node<C> {
     }
 }
 
-impl<C: Clone> Store<C> {
+impl<C: Clone + fmt::Display> Store<C> {
     /// Simply delegate the call to the wrapped store.
     fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         match self {
@@ -346,9 +346,21 @@ impl<C: Clone> Store<C> {
 
 /// We can't use the default Debug implementation because it prints the whole
 /// store.
-impl<C: fmt::Debug + Clone> fmt::Debug for BinaryTree<C> {
+impl<C: fmt::Display + Clone> fmt::Debug for BinaryTree<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "root: {:?}, height: {:?}", self.root, self.height)
+        write!(f, "root: {}, height: {:?}", self.root, self.height)
+    }
+}
+
+impl<C: fmt::Display> fmt::Display for Node<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(content: {}, coord: {:?})", self.content, self.coord)
+    }
+}
+
+impl fmt::Display for Coordinate {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(x: {:?}, y: {:?})", self.x, self.y)
     }
 }
 
@@ -364,18 +376,18 @@ enum NodeOrientation {
 
 /// Used to orient nodes inside a sibling pair so that the compiler can
 /// guarantee a left node is actually a left node.
-enum Sibling<C> {
+enum Sibling<C: fmt::Display> {
     Left(Node<C>),
     Right(Node<C>),
 }
 
 /// A pair of sibling nodes.
-struct MatchedPair<C> {
+struct MatchedPair<C: fmt::Display> {
     left: Node<C>,
     right: Node<C>,
 }
 
-impl<C> From<Node<C>> for Sibling<C> {
+impl<C: fmt::Display> From<Node<C>> for Sibling<C> {
     /// Move a generic node into the left/right sibling type.
     fn from(node: Node<C>) -> Self {
         match node.orientation() {
@@ -385,7 +397,7 @@ impl<C> From<Node<C>> for Sibling<C> {
     }
 }
 
-impl<C: Mergeable> MatchedPair<C> {
+impl<C: Mergeable + fmt::Display> MatchedPair<C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
         Node {
@@ -395,7 +407,7 @@ impl<C: Mergeable> MatchedPair<C> {
     }
 }
 
-impl<C> From<(Node<C>, Node<C>)> for MatchedPair<C> {
+impl<C: fmt::Display> From<(Node<C>, Node<C>)> for MatchedPair<C> {
     /// Construct a [MatchedPair] using the 2 given nodes.
     ///
     /// Only build the pair if the 2 nodes are siblings, otherwise panic.

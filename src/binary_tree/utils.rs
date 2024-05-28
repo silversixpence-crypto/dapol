@@ -37,6 +37,12 @@ pub mod test_utils {
         }
     }
 
+    impl fmt::Display for TestContent {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "(value: {:?}, hash: {:?})", self.value, self.hash)
+        }
+    }
+
     pub fn generate_padding_closure() -> impl Fn(&Coordinate) -> TestContent {
         |_coord: &Coordinate| -> TestContent {
             TestContent {
