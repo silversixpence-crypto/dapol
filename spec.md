@@ -14,9 +14,27 @@ The implementation is written in Rust due to a) the readily available libraries 
 
 ## Key
 
-- Entity (aka user) - Represents a single unit of the external data that is to be modeled by the protocol. Each entity has an ID ($\text{id}_u$) and a liability ($l_u$).
+General:
+- Entity (aka user aka $u$) - Represents a single unit of the external data that is to be modeled by the protocol. Each entity has an ID ($\text{id}_u$) and a liability ($l_u$).
 - $\mathcal{P}$ - constructor of the tree (aka prover)
 - PBB - (public bulletin board)
+- MST - Merkle Sum Tree (a type of binary tree)
+- Leaf node - a bottom-layer node of the MST that corresponds to an entity
+- Padding node - a node in the MST that has no children and is not associated with an entity
+- Pedersen commitment - a type of homomorphic cryptographic commitment and/or encryption scheme (see [original paper](https://link.springer.com/chapter/10.1007/3-540-46766-1_9) or more practical explanation [here](https://asecuritysite.com/zero/ped))
+- $\text{KDF}$ - Key Derivation Function
+- $\text{Hash}$ - hash function
+- $M$ - master secret
+- $S_{\text{com}}$ - public salt for blinding factor for Pedersen commitments
+- $S_{\text{hash}}$ - public salt for the hash function
+
+Formulas:
+- leaf node (for some user $u$):
+  - $w_u=\text{KDF}(M,\text{id}_u)$ - entity's secret value
+  - $s_u=\text{KDF}(w_u, S_{\text{hash}})$ - entity's salt value
+  - $b_u=\text{KDF}(w_u, S_{\text{com}})$ - entity's blinding factor
+  - $c_u=g_1^{l_u}g_2^{b_u}$ - entity's Pedersen commitment
+  - $h_u=\text{H}(\text{"leaf"} | \text{id}_u | s_u) - entity's node hash
 
 ## How Proof of Liabilities (PoL) works
 
@@ -30,9 +48,19 @@ Let's explain with the example of the cryptocurrency exchange mentioned above: $
 - user data stays hidden throughout the whole process
 
 Here is a simplified version of the Proof of Liabilities function (see the paper for a more detailed formulation):
-$$P(\{\text{users' liabilities}\}) = \text{commitment}$$
+$$\text{PoL}(\{\text{users' liabilities}\}) = \text{commitment}$$
 
-## PoL data, functions & parameters
+The exchange produces the commitment, and then posts it on the PBB. In order for a user to verify their liability with the commitment they have to request an **inclusion proof** from the exchange. Together with the commitment, the inclusion proof can be used to cryptographically verify the user's liability.
+
+The exchange is expected to create many PoLs over time. Ideally at a fixed cadence, such as once a day.
+
+DAPOL+ uses a Merkle Sum Tree (a type of binary tree) as the underlying data structure. Each user's liability is a leaf node (encrypted as a Pedersen commitment) and the commitment is the root node.
+
+## Full process followed by $\mathcal{P}$ & its entities
+
+TODO
+
+## DAPOL+ data & parameters
 
 ### Public parameters
 
@@ -42,8 +70,8 @@ $$\left( ( \mathbb{G}, g_1, g_2 ), \mathcal{R}, N, \text{MaxL}, H, S_{\text{com}
 
 where
 - $\mathbb{G}$ is a group of prime order, with generators $g_1$ & $g_2$ s.t. their relative logarithm is unknown
-- $N$ is the upper bound on the number of entities i.e. if $n$ is the number of entities to be modeled by the tree, then $n < N$ (note that we must have $N \le 2^H$ since that is the maximum number of bottom layer leaf node for entities)
-- $\text{MaxL}$ is the maximum liability of any single entity, and is used to determine the upper bound for the range proof: $N \text{MaxL}$
+- $N$ is the upper bound on the number of entities i.e. if $n$ is the number of entities to be modeled by the tree, then $n < N$ (note that we must have $N \le 2^H$ since that is the maximum number of bottom layer leaf nodes in a binary tree)
+- $\text{MaxL}$ is the maximum liability of any single entity, and is used to determine the upper bound for the range proof: $N \times \text{MaxL}$
 - $H$ is the height of the tree
 - $S_{\text{com}}$ is the salt used to calculate a leaf/padding node's Pedersen commitment
 - $S_{\text{hash}}$ is the salt used to calculate a leaf/padding node's hash
@@ -52,14 +80,16 @@ where
 The following values are set automatically by the codebase:
 - $\mathbb{G}$ is the Ristretto Group for Curve25519 with the following generator elements
   - $g_1=$ [ED25519_BASEPOINT](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/backend/serial/u64/constants.rs#L129)
-  - $g_2=\text{pointFromHash}(\text{hash}(g_1))$ (SHA3 is used as the hash function, and the Elligator map is used to turn the digest into an elliptic curve point, see [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/ristretto.rs#L688) for more details, also [Ristretto group section](#Ristretto))
-- $\mathcal{R}$ is the Bulletproofs protocol, also using the Ristretto Group for Curve25519
+  - $g_2=\text{pointFromHash}(\text{hash}(g_1))$ (SHA3 is used as the hash function, and the Elligator map is used to turn the digest into an elliptic curve point, see [here](https://github.com/zkcrypto/curve25519-dalek-ng/blob/ae4bf40e28bddee0f3a6a6b3d7492874c24c2e54/src/ristretto.rs#L688) for more details, or further down in the [Ristretto group section](#Ristretto))
+- $\mathcal{R}$ is the [Bulletproofs](https://eprint.iacr.org/2017/1066.pdf) protocol, also using the Ristretto Group for Curve25519
 - $N=2^H$ because this sets the highest possible upper bound
 
 These values can be set by $\mathcal{P}$:
 - $\text{MaxL}$ (default is $2^{32}$)
 - $H$ (default is $32$)
 - Both the salts (default to being randomly generated using a CSPRNG)
+
+TODO b_u & l_u are mentioned here without definitions, we should define these (and also 'u')
 
 #### Note on the salts
 
@@ -71,6 +101,8 @@ Both the salts should be changed for each PoL generated. If this is not done the
     3. The liabilities generally have less than 64 bits of entropy so the attacker can guess the value of $l_u-l'_u$, which gives the attacker insight into the trading actions taken by the entity
 
 ### Public data (PD)
+
+TODO define h & c
 
 Each tree in DAPOL+ has a PD tuple which needs to be posted on a PBB for the PoL protocol to function properly. The PD tuple consists of the hash & Pedersen commitment of the root node: $PD = (h_{\text{root}}, c_{\text{root}})$.
 
@@ -98,11 +130,11 @@ The user mapping must be known only by $\mathcal{P}$ because exposing this will 
 
 In the code $\epsilon$ is a hashmap from entity ID to x-coordinate on the bottom layer of the tree.
 
-### Tree
+### MST
 
 The security & privacy proofs in the paper assume the tree is held by $\mathcal{P}$ and so it is recommended that the tree be kept secret and inclusion proofs only given out to authenticated entities.
 
-### Functions
+## DAPOL+ functions
 
 Functions from the paper and their equivalents in the code:
 
