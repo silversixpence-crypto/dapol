@@ -396,7 +396,7 @@ impl PathSiblings<HiddenNodeContent> {
         dir: PathBuf,
         mut file_name: OsString,
     ) -> Result<(), PathSiblingsWriteError> {
-        if dir.is_dir() {
+        if !dir.is_dir() {
             return Err(PathSiblingsWriteError::InvalidDirectory(
                 dir.into_os_string(),
             ));
