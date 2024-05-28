@@ -6,16 +6,22 @@
 
 Licensed under [MIT](LICENSE).
 
-## About
+## About this repo
 
-Implementation of the DAPOL+ protocol introduced in the "Generalized Proof of Liabilities" by Yan Ji and Konstantinos Chalkias ACM CCS 2021 paper, available [here](https://eprint.iacr.org/2021/1350).
+This repo is a Rust implementation of the DAPOL+ protocol, which was introduced in the "Generalized Proof of Liabilities" ACM CCS 2021 paper, by Yan Ji and Konstantinos Chalkias (available [here](https://eprint.iacr.org/2021/1350)).
 
-See the [top-level doc for the project](https://hackmd.io/p0dy3R0RS5qpm3sX-_zreA) if you would like to know more about Proof of Liabilities.
+DAPOL+ (Distributed Auditing Proof of Liabilities) is a protocol around a Merkle Sum Tree that allows an entity to cryptographically commit to it's liabilities in a way that maintains data privacy and verifiability. Some examples of where this protocol is useful:
+- Centralized cryptocurrency exchange uses DAPOL+ to commit to the digital asset balances it owes it's users, and the users can verify that their balances are correctly represented in the tree
+- Hospitals commit to their COVID case count, and their patients can check that their case was correctly recorded
+
+This repo is part of a larger Proof of Reserves project. For more information on Proof of Liabilities you can check out [this blog](https://reservex.io/blogs/1). And for more information on the Proof of Reserves project in general you can check out this [top-level doc for the project](https://hackmd.io/p0dy3R0RS5qpm3sX-_zreA).
+
+If you would like to contact the owners to get advice on how to integrate this protocol into your system, then reach out [here](https://reservex.io/contact).
 
 ## Still to be done
 
-This project is currently still a work in progress, but is ready for
-use as is. The code has _not_ been audited yet (as of Nov 2023) and so it is not recommended to use it in production. Progress can be tracked [here](https://github.com/silversixpence-crypto/dapol/issues/91).
+This repo is still a work in progress, but is ready for
+use as is. The code has _not_ been audited yet (as of May 2024) and so it is not recommended to use it in production yet. Progress on the audit can be tracked [here](https://github.com/silversixpence-crypto/dapol/issues/91).
 
 Important tasks still to be done:
 - Write a spec: https://github.com/silversixpence-crypto/dapol/issues/17
@@ -112,7 +118,20 @@ dapol -vvv verify-proof --file-path <inclusion_proof_file> --root-hash <hash>
 
 The root hash is logged out at info level when the tree is built or deserialized.
 
-## Unit test fuzzing
+## Development
+
+To get access to the CLI for a local copy of the repo you can do the following:
+```bash
+cargo build --release
+./target/release/dapol help
+```
+
+To run the doc, unit & integration tests you can do
+```bash
+cargo test
+```
+
+### Run the fuzz unit tests
 
 Follow the steps in the [Rust Fuzz Book](https://rust-fuzz.github.io/book/introduction.html) to get started. Essentially:
 ```bash
@@ -145,11 +164,11 @@ MAX_HEIGHT=64
 LOG_VERBOSITY=none # supports error, warn, info, debug
 ```
 
-The benches are split into 2 parts: Criterion (for small benches) and manual (for large benches). Some of the values of $n$ cause the benchmarks to take *really* long (up to an hour), and so using Criterion (which takes a minimum of 10 samples per bench) makes things too slow. It is advised to run Criterion benches for $n<1000000$ and manual benches otherwise.
-
 A set of tuples is used as input to the benches:
 
 ![](resources/readme_eq_benchmark.svg)
+
+The benches are split into 2 parts: Criterion (for small benches) and manual (for large benches). Some of the values of $n$ cause the benchmarks to take *really* long (up to an hour), and so using Criterion (which takes a minimum of 10 samples per bench) makes things too slow. It is advised to run Criterion benches for $n<1000000$ and manual benches otherwise.
 
 You may experience an error building the benches if you are on a fresh Linux machine. If the jemalloc-sys package fails to build then maybe [this](https://github.com/tikv/jemallocator/issues/29) will help.
 
