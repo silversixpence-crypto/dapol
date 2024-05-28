@@ -117,7 +117,7 @@ mod secret;
 pub use secret::{Secret, SecretParserError};
 
 mod inclusion_proof;
-pub use inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
+pub use inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError, InclusionProofFileType};
 
 mod entity;
 pub use entity::{Entity, EntityId, EntityIdsParser, EntityIdsParserError};

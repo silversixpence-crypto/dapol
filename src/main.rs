@@ -7,7 +7,7 @@ use dapol::{
     cli::{BuildKindCommand, Cli, Command},
     initialize_machine_parallelism,
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr, LogOnErrUnwrap},
-    AggregationFactor, DapolConfig, DapolConfigBuilder, DapolTree, EntityIdsParser, InclusionProof,
+    AggregationFactor, DapolConfig, DapolConfigBuilder, DapolTree, EntityIdsParser, InclusionProof, InclusionProofFileType,
 };
 use patharg::InputArg;
 
@@ -65,7 +65,7 @@ fn main() {
                         entity_source.entities_file.and_then(|arg| arg.into_path()),
                     )
                     .num_random_entities_opt(entity_source.random_entities)
-                    .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
+                    .secrets_file_path_opt(secrets_file.into_path())
                     .build()
                     .log_on_err_unwrap()
                     .parse()
@@ -107,7 +107,7 @@ fn main() {
                         .generate_inclusion_proof(&entity_id)
                         .log_on_err_unwrap();
 
-                    proof.serialize(&entity_id, dir.clone()).log_on_err_unwrap();
+                    proof.serialize(&entity_id, dir.clone(), InclusionProofFileType::Json).log_on_err_unwrap();
                 }
             }
 
@@ -130,6 +130,7 @@ fn main() {
             entity_ids,
             tree_file,
             range_proof_aggregation,
+            file_type,
         } => {
             let dapol_tree = DapolTree::deserialize(
                 tree_file
@@ -138,17 +139,27 @@ fn main() {
             )
             .log_on_err_unwrap();
 
-            // TODO for entity IDs: accept either path or stdin
-            let entity_ids = EntityIdsParser::from(
-                entity_ids
-                    .into_path()
-                    .expect("Expected file path, not stdin"),
-            )
+            let entity_ids = if entity_ids.is_path() {
+                EntityIdsParser::from(
+                    entity_ids
+                        .into_path()
+                        .expect("Expected file path, not stdin"),
+                )
+            } else {
+                EntityIdsParser::from_str(
+                    &entity_ids
+                        .read_to_string()
+                        .expect("Problem reading from stdin"),
+                )
+                .log_on_err_unwrap()
+            }
             .parse()
             .log_on_err_unwrap();
 
             let dir = PathBuf::from("./inclusion_proofs/");
-            std::fs::create_dir(dir.as_path()).log_on_err_unwrap();
+            if !dir.exists() {
+                std::fs::create_dir(dir.as_path()).log_on_err_unwrap();
+            }
 
             let aggregation_factor = AggregationFactor::Percent(range_proof_aggregation);
 
@@ -157,7 +168,7 @@ fn main() {
                     .generate_inclusion_proof_with(&entity_id, aggregation_factor.clone())
                     .log_on_err_unwrap();
 
-                proof.serialize(&entity_id, dir.clone()).log_on_err_unwrap();
+                proof.serialize(&entity_id, dir.clone(), file_type.clone()).log_on_err_unwrap();
             }
         }
         Command::VerifyInclusionProof {

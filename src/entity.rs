@@ -40,13 +40,13 @@ pub const ENTITY_ID_MAX_BYTES: usize = 32;
 pub struct EntityId(String);
 
 impl FromStr for EntityId {
-    type Err = EntitiesParserError;
+    type Err = EntityIdsParserError;
 
     /// Constructor that takes in a string slice.
     /// If the length of the str is greater than the max then Err is returned.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() > ENTITY_ID_MAX_BYTES {
-            Err(EntitiesParserError::EntityIdTooLongError { id: s.into() })
+            Err(Self::Err::EntityIdTooLongError { id: s.into() })
         } else {
             Ok(EntityId(s.into()))
         }
