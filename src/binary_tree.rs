@@ -47,7 +47,9 @@ pub use tree_builder::{
 };
 
 mod path_siblings;
-pub use path_siblings::{PathSiblings, PathSiblingsBuildError, PathSiblingsError};
+pub use path_siblings::{
+    PathSiblings, PathSiblingsBuildError, PathSiblingsError, PathSiblingsWriteError,
+};
 
 mod height;
 pub use height::{Height, HeightError, MAX_HEIGHT, MIN_HEIGHT};

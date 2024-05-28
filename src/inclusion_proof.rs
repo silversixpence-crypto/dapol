@@ -141,10 +141,8 @@ impl InclusionProof {
         })
     }
 
-    /// Verify that an inclusion proof matches a given root hash.
+    /// Verify that an inclusion proof matches a the root hash.
     pub fn verify(&self, root_hash: H256) -> Result<(), InclusionProofError> {
-        use curve25519_dalek_ng::ristretto::CompressedRistretto;
-
         info!("Verifying inclusion proof..");
 
         // Is this cast safe? Yes because the tree height (which is the same as the
@@ -153,67 +151,127 @@ impl InclusionProof {
         let tree_height = Height::from_y_coord(self.path_siblings.len() as u8);
 
         let hidden_leaf_node: Node<HiddenNodeContent> = self.leaf_node.clone().convert();
+        let constructed_path = self.path_siblings.construct_path(hidden_leaf_node)?;
 
-        {
-            // Merkle tree path verification
-
-            use bulletproofs::PedersenGens;
-            use curve25519_dalek_ng::scalar::Scalar;
-
-            // PartialEq for HiddenNodeContent does not depend on the commitment so we can
-            // make this whatever we like
-            let dummy_commitment =
-                PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
-
-            let root = Node {
-                content: HiddenNodeContent::new(dummy_commitment, root_hash),
-                coord: Coordinate {
-                    x: 0,
-                    y: tree_height.as_y_coord(),
-                },
-            };
-
-            let constructed_root = self.path_siblings.construct_root_node(&hidden_leaf_node)?;
-
-            if constructed_root != root {
-                return Err(InclusionProofError::RootMismatch);
-            }
-        }
-
-        {
-            // Range proof verification
-
-            let aggregation_index = self.aggregation_factor.apply_to(&tree_height) as usize;
-
-            let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
-                .path_siblings
-                .construct_path(hidden_leaf_node)?
-                .iter()
-                .map(|node| node.content.commitment.compress())
-                .collect();
-
-            let commitments_for_individual_proofs =
-                commitments_for_aggregated_proofs.split_off(aggregation_index);
-
-            if let Some(proofs) = &self.individual_range_proofs {
-                commitments_for_individual_proofs
-                    .iter()
-                    .zip(proofs.iter())
-                    .map(|(com, proof)| proof.verify(com, self.upper_bound_bit_length))
-                    .collect::<Result<Vec<_>, _>>()?;
-            }
-
-            if let Some(proof) = &self.aggregated_range_proof {
-                proof.verify(
-                    &commitments_for_aggregated_proofs,
-                    self.upper_bound_bit_length,
-                )?;
-            }
-        }
+        self.verify_merkle_path(root_hash, tree_height, &constructed_path)?;
+        self.verify_range_proofs(tree_height, &constructed_path)?;
 
         info!("Succesfully verified proof");
 
         Ok(())
+    }
+
+    /// Verify that an inclusion proof matches the root hash, and show path info.
+    ///
+    /// The path information is printed to stdout, and written to a json file
+    /// in the given location.
+    pub fn verify_and_show_path_info(
+        self,
+        root_hash: H256,
+        dir: PathBuf,
+        mut file_name: OsString,
+    ) -> Result<(), InclusionProofError> {
+        info!("Verifying inclusion proof..");
+
+        // Is this cast safe? Yes because the tree height (which is the same as the
+        // length of the input) is also stored as a u8, and so there would never
+        // be more siblings than max(u8).
+        let tree_height = Height::from_y_coord(self.path_siblings.len() as u8);
+
+        let hidden_leaf_node: Node<HiddenNodeContent> = self.leaf_node.clone().convert();
+        let constructed_path = self.path_siblings.construct_path(hidden_leaf_node)?;
+
+        self.verify_merkle_path(root_hash, tree_height, &constructed_path)?;
+        self.verify_range_proofs(tree_height, &constructed_path)?;
+
+        info!("Succesfully verified proof");
+
+        let path_str = self.path_siblings.path_to_str(&constructed_path);
+        info!("{}", path_str);
+
+        self.path_siblings
+            .write_path_to_json(constructed_path, dir, file_name)?;
+
+        Ok(())
+    }
+
+    /// Merkle tree path verification.
+    fn verify_merkle_path(
+        &self,
+        root_hash: H256,
+        tree_height: Height,
+        path_nodes: &Vec<Node<HiddenNodeContent>>,
+    ) -> Result<(), InclusionProofError> {
+        use bulletproofs::PedersenGens;
+        use curve25519_dalek_ng::scalar::Scalar;
+
+        // PartialEq for HiddenNodeContent does not depend on the commitment so we can
+        // make this whatever we like
+        let dummy_commitment = PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
+
+        let root = Node {
+            content: HiddenNodeContent::new(dummy_commitment, root_hash),
+            coord: Coordinate {
+                x: 0,
+                y: tree_height.as_y_coord(),
+            },
+        };
+
+        // this should never panic because the path construction checks for min length
+        let constructed_root = path_nodes.last().expect(
+            "[Bug in proof verification] there should have been at least 1 node in the path",
+        );
+
+        if constructed_root != &root {
+            Err(InclusionProofError::RootMismatch)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Range proof verification.
+    fn verify_range_proofs(
+        &self,
+        tree_height: Height,
+        path_nodes: &Vec<Node<HiddenNodeContent>>,
+    ) -> Result<(), InclusionProofError> {
+        use curve25519_dalek_ng::ristretto::CompressedRistretto;
+
+        let aggregation_index = self.aggregation_factor.apply_to(&tree_height) as usize;
+
+        let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = path_nodes
+            .iter()
+            .map(|node| node.content.commitment.compress())
+            .collect();
+
+        let commitments_for_individual_proofs =
+            commitments_for_aggregated_proofs.split_off(aggregation_index);
+
+        let mut at_least_one_checked = false;
+
+        if let Some(proofs) = &self.individual_range_proofs {
+            commitments_for_individual_proofs
+                .iter()
+                .zip(proofs.iter())
+                .map(|(com, proof)| proof.verify(com, self.upper_bound_bit_length))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            at_least_one_checked = true;
+        }
+
+        if let Some(proof) = &self.aggregated_range_proof {
+            proof.verify(
+                &commitments_for_aggregated_proofs,
+                self.upper_bound_bit_length,
+            )?;
+            at_least_one_checked = true;
+        }
+
+        if !at_least_one_checked {
+            Err(InclusionProofError::MissingRangeProof)
+        } else {
+            Ok(())
+        }
     }
 
     /// Serialize the [InclusionProof] structure to a binary file.
@@ -238,8 +296,12 @@ impl InclusionProof {
         info!("Serializing inclusion proof to path {:?}", path);
 
         match file_type {
-            InclusionProofFileType::Binary => read_write_utils::serialize_to_bin_file(&self, path.clone())?,
-            InclusionProofFileType::Json => read_write_utils::serialize_to_json_file(&self, path.clone())?,
+            InclusionProofFileType::Binary => {
+                read_write_utils::serialize_to_bin_file(&self, path.clone())?
+            }
+            InclusionProofFileType::Json => {
+                read_write_utils::serialize_to_json_file(&self, path.clone())?
+            }
         }
 
         Ok(path)
@@ -261,7 +323,9 @@ impl InclusionProof {
         info!("Deserializing inclusion proof from file {:?}", file_path);
 
         match ext {
-            SERIALIZED_PROOF_EXTENSION => Ok(read_write_utils::deserialize_from_bin_file(file_path)?),
+            SERIALIZED_PROOF_EXTENSION => {
+                Ok(read_write_utils::deserialize_from_bin_file(file_path)?)
+            }
             "json" => Ok(read_write_utils::deserialize_from_json_file(file_path)?),
             _ => Err(InclusionProofError::UnsupportedFileType { ext: ext.into() }),
         }
@@ -334,12 +398,16 @@ pub enum InclusionProofError {
     RootMismatch,
     #[error("Issues with range proof")]
     RangeProofError(#[from] RangeProofError),
+    #[error("No range proofs detected")]
+    MissingRangeProof,
     #[error("Error serializing/deserializing file")]
     SerdeError(#[from] crate::read_write_utils::ReadWriteError),
     #[error("The file type with extension {ext:?} is not supported")]
     UnsupportedFileType { ext: String },
     #[error("Unable to find file extension for path {0:?}")]
     UnknownFileType(OsString),
+    #[error("Error writing path info to file")]
+    PathWriteError(#[from] crate::binary_tree::PathSiblingsWriteError),
 }
 
 #[derive(thiserror::Error, Debug)]
