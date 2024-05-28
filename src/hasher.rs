@@ -18,6 +18,24 @@ const DELIMITER: &[u8] = ";".as_bytes();
 /// hasher.update("leaf".as_bytes());
 /// let hash = hasher.finalize();
 /// ```
+///
+/// Note that a delimiter is used to add extra security:
+/// ```
+/// use dapol::Hasher;
+/// let mut dapol_hasher = Hasher::new();
+/// dapol_hasher.update("leaf".as_bytes());
+/// dapol_hasher.update("node".as_bytes());
+/// let dapol_hash = dapol_hasher.finalize();
+///
+/// let mut blake_hasher = blake3::Hasher::new();
+/// blake_hasher.update("leaf".as_bytes());
+/// blake_hasher.update(";".as_bytes());
+/// blake_hasher.update("node".as_bytes());
+/// blake_hasher.update(";".as_bytes());
+/// let blake_hash = blake_hasher.finalize();
+///
+/// assert_eq!(dapol_hash.as_bytes(), blake_hash.as_bytes());
+/// ```
 pub struct Hasher(blake3::Hasher);
 
 impl Hasher {
@@ -49,19 +67,30 @@ mod tests {
 
     // Ensures Blake 3 library produces correct hashed output.
     // Comparison hash derived through the following urls:
-    // https://toolkitbay.com/tkb/tool/BLAKE3
-    // https://connor4312.github.io/blake3/index.html
     // https://asecuritysite.com/hash/blake3
+    // https://emn178.github.io/online-tools/blake3.html
+    //
+    // For https://connor4312.github.io/blake3/index.html do the following:
+    // -> select utf-8 input option
+    // -> paste in "dapol;PoR;"
+    // -> see resulting hash is equal to b0424ae23fcce672aaff99e9f433286e27119939a280743539783ba7aade8294
+    //
+    // For https://toolkitbay.com/tkb/tool/BLAKE3 do the following:
+    // -> select "text input" option
+    // -> paste in "dapol;PoR;"
+    // -> click "process from text"
+    // -> see resulting hash is equal to b0424ae23fcce672aaff99e9f433286e27119939a280743539783ba7aade8294
     #[test]
     fn verify_hasher() {
         use std::str::FromStr;
 
         let mut hasher = Hasher::new();
-        hasher.update("dapol-PoR".as_bytes());
+        hasher.update("dapol".as_bytes());
+        hasher.update("PoR".as_bytes());
         let hash = hasher.finalize();
         assert_eq!(
             hash,
-            H256::from_str("09eb9ee70fc9df4d767b07cc5befc6f7a303fa0025fca014e22e8c3dc9927767")
+            H256::from_str("b0424ae23fcce672aaff99e9f433286e27119939a280743539783ba7aade8294")
                 .unwrap()
         );
     }

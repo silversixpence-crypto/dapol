@@ -16,7 +16,7 @@
 //! are stored.
 
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 use log::warn;
 use logging_timer::stime;
@@ -41,7 +41,7 @@ const BUG: &str = "[Bug in single-threaded builder]";
 /// The leaf nodes are sorted by x-coord, checked for duplicates, and
 /// converted to the right type.
 #[stime("info", "SingleThreadedBuilder::{}")]
-pub fn build_tree<C, F>(
+pub fn build_tree<C: fmt::Display, F>(
     height: Height,
     store_depth: u8,
     mut input_leaf_nodes: Vec<InputLeafNode<C>>,
@@ -88,11 +88,11 @@ where
 // Store.
 
 #[derive(Serialize, Deserialize)]
-pub struct HashMapStore<C> {
+pub struct HashMapStore<C: fmt::Display> {
     map: Map<C>,
 }
 
-impl<C: Clone> HashMapStore<C> {
+impl<C: Clone + fmt::Display> HashMapStore<C> {
     pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         self.map.get(coord).map(|n| (*n).clone())
     }
@@ -109,12 +109,12 @@ impl<C: Clone> HashMapStore<C> {
 ///
 /// At least one of the fields is expected to be set. If this is not the case
 /// then it is assumed there is a bug in the code using this struct.
-struct MaybeUnmatchedPair<C> {
+struct MaybeUnmatchedPair<C: fmt::Display> {
     left: Option<Node<C>>,
     right: Option<Node<C>>,
 }
 
-impl<C> MaybeUnmatchedPair<C> {
+impl<C: fmt::Display> MaybeUnmatchedPair<C> {
     /// Convert the partially matched pair into a matched pair.
     ///
     /// If both left and right nodes are not present then the function will
@@ -144,7 +144,7 @@ impl<C> MaybeUnmatchedPair<C> {
     }
 }
 
-impl<C> Node<C> {
+impl<C: fmt::Display> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
@@ -184,7 +184,7 @@ type RootNode<C> = Node<C>;
 ///
 /// Note that all bottom layer nodes are stored, both the inputted leaf
 /// nodes and their accompanying padding nodes.
-pub fn build_node<C, F>(
+pub fn build_node<C: fmt::Display, F>(
     leaf_nodes: Vec<Node<C>>,
     height: &Height,
     store_depth: u8,

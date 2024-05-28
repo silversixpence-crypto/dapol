@@ -7,7 +7,8 @@ use dapol::{
     cli::{BuildKindCommand, Cli, Command},
     initialize_machine_parallelism,
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr, LogOnErrUnwrap},
-    AggregationFactor, DapolConfig, DapolConfigBuilder, DapolTree, EntityIdsParser, InclusionProof, InclusionProofFileType,
+    AggregationFactor, DapolConfig, DapolConfigBuilder, DapolTree, EntityIdsParser, InclusionProof,
+    InclusionProofFileType,
 };
 use patharg::InputArg;
 
@@ -107,7 +108,9 @@ fn main() {
                         .generate_inclusion_proof(&entity_id)
                         .log_on_err_unwrap();
 
-                    proof.serialize(&entity_id, dir.clone(), InclusionProofFileType::Json).log_on_err_unwrap();
+                    proof
+                        .serialize(&entity_id, dir.clone(), InclusionProofFileType::Json)
+                        .log_on_err_unwrap();
                 }
             }
 
@@ -168,21 +171,39 @@ fn main() {
                     .generate_inclusion_proof_with(&entity_id, aggregation_factor.clone())
                     .log_on_err_unwrap();
 
-                proof.serialize(&entity_id, dir.clone(), file_type.clone()).log_on_err_unwrap();
+                proof
+                    .serialize(&entity_id, dir.clone(), file_type.clone())
+                    .log_on_err_unwrap();
             }
         }
         Command::VerifyInclusionProof {
             file_path,
             root_hash,
+            show_path,
         } => {
-            let proof = InclusionProof::deserialize(
-                file_path
-                    .into_path()
-                    .expect("Expected file path, not stdin"),
-            )
-            .log_on_err_unwrap();
+            let file_path = file_path
+                .into_path()
+                .expect("Expected file path, not stdin");
 
-            proof.verify(root_hash).log_on_err_unwrap();
+            let proof = InclusionProof::deserialize(file_path.clone()).log_on_err_unwrap();
+
+            if show_path {
+                proof
+                    .verify_and_show_path_info(
+                        root_hash,
+                        file_path
+                            .parent()
+                            .expect("Expected file_path to have a parent")
+                            .to_path_buf(),
+                        file_path
+                            .file_name()
+                            .expect("Expected file_path to have a file name")
+                            .to_os_string(),
+                    )
+                    .log_on_err_unwrap();
+            } else {
+                proof.verify(root_hash).log_on_err_unwrap();
+            }
         }
         Command::VerifyRoot { root_pub, root_pvt } => {
             let public_root_data = DapolTree::deserialize_public_root_data(
