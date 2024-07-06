@@ -4,7 +4,7 @@
 //! types of accumulators, which can all be found under this module.
 
 use clap::ValueEnum;
-use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
+use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
 use primitive_types::H256;
 use serde::{Deserialize, Serialize};
 use std::fmt;

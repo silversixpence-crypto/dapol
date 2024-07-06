@@ -86,7 +86,7 @@ pub use dapol_tree::{
     SERIALIZED_ROOT_PVT_FILE_PREFIX, SERIALIZED_TREE_EXTENSION, SERIALIZED_TREE_FILE_PREFIX,
 };
 
-pub use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
+pub use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
 
 mod dapol_config;
 pub use dapol_config::{

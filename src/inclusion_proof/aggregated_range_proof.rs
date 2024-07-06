@@ -36,7 +36,7 @@
 //! more efficient, but for $n=255$ padding would win.
 
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
-use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
+use curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar};
 use merlin::Transcript;
 use serde::{Deserialize, Serialize};
 
@@ -63,7 +63,7 @@ pub enum AggregatedRangeProof {
 // TODO are these the best option for the pad? Maybe there is another option
 // that gives efficiency guarantees
 fn padding_tuple() -> (u64, Scalar) {
-    (0, Scalar::one())
+    (0, Scalar::ONE)
 }
 
 /// The transcript initial state must be the same for proof generation and

@@ -203,7 +203,7 @@ impl InclusionProof {
         path_nodes: &Vec<Node<HiddenNodeContent>>,
     ) -> Result<(), InclusionProofError> {
         use bulletproofs::PedersenGens;
-        use curve25519_dalek_ng::scalar::Scalar;
+        use curve25519_dalek::scalar::Scalar;
 
         // PartialEq for HiddenNodeContent does not depend on the commitment so we can
         // make this whatever we like
@@ -235,7 +235,7 @@ impl InclusionProof {
         tree_height: Height,
         path_nodes: &Vec<Node<HiddenNodeContent>>,
     ) -> Result<(), InclusionProofError> {
-        use curve25519_dalek_ng::ristretto::CompressedRistretto;
+        use curve25519_dalek::ristretto::CompressedRistretto;
 
         let aggregation_index = self.aggregation_factor.apply_to(&tree_height) as usize;
 
@@ -432,7 +432,7 @@ mod tests {
     use crate::hasher::Hasher;
 
     use bulletproofs::PedersenGens;
-    use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
+    use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
     use primitive_types::H256;
 
     // The tree that is built, with path highlighted.
